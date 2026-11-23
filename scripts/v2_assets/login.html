@@ -1,0 +1,66 @@
+<!-- =========================================================
+     登录页：拖动滑块验证
+     ========================================================= -->
+<div id="login">
+
+  <!-- 左侧品牌区 -->
+  <div class="lg-left">
+    <div class="lg-brand">
+      <div class="lg-seal">遗</div>
+      <div>
+        <h1>非物质文化遗产数字资产<br>分级确权与溯源系统</h1>
+        <div class="en">ICH DIGITAL ASSET LEDGER</div>
+      </div>
+    </div>
+
+    <div class="lg-title">
+      <h2>让每一件<em>非遗</em><br>都有据可<em>查</em></h2>
+      <p>纹样「像不像」用向量相似度量化，「从哪来」用母题血缘与链式授权固化，
+        「谁定的」用列级权限与不可篡改日志固化。</p>
+    </div>
+
+    <ul class="lg-points">
+      <li><span class="k">1</span><div><b>AI 只出建议，不改权属</b>　模型给出档位与置信度，最终级别只能由专家终审写入</div></li>
+      <li><span class="k">2</span><div><b>三档分级有明确的阈值边界</b>　相似度低于 0.80 判原创，0.80–0.92 判改编衍生，高于 0.92 判公有母题</div></li>
+      <li><span class="k">3</span><div><b>推翻 AI 会被单独标记</b>　专家结论与 AI 不一致时写入 is_override，台账可查</div></li>
+    </ul>
+  </div>
+
+  <!-- 右侧登录卡 -->
+  <div class="lg-right">
+    <div class="lg-card">
+      <h3>选择身份登录</h3>
+      <div class="hint">演示环境预置 4 个账号，密码均为 <b>Passw0rd!</b></div>
+
+      <div class="lg-label">登录账号 <span class="req">*</span></div>
+      <div class="acc-grid" id="accGrid"></div>
+
+      <div class="lg-label">密码 <span class="req">*</span></div>
+      <input class="inp" id="pw" type="password" value="Passw0rd!"
+             autocomplete="off" style="margin-bottom:18px">
+
+      <div class="lg-label">安全验证 <span class="req">*</span></div>
+      <div class="slider" id="slider">
+        <div class="fill" id="slFill"></div>
+        <div class="txt" id="slTxt">按住滑块，拖到最右侧</div>
+        <div class="knob" id="slKnob">›</div>
+      </div>
+
+      <div class="lg-err" id="lgErr"></div>
+
+      <div class="lg-row">
+        <label class="switch" id="rememberSw">
+          <span class="track"></span><span class="lb">记住这次选择</span>
+        </label>
+        <a href="#" id="forgot">忘记密码？</a>
+      </div>
+
+      <button class="lg-submit" id="lgSubmit" disabled>请先拖动滑块完成验证</button>
+
+      <div class="lg-foot">
+        演示数据为本地内置副本，全部操作只改浏览器内存<br>
+        <b>不连接任何服务器，不写入任何数据库</b>
+      </div>
+    </div>
+  </div>
+</div>

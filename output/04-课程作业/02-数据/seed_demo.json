@@ -1,0 +1,439 @@
+{
+  "_meta": {
+    "name": "非遗数字资产平台 · 演示种子数据",
+    "version": "1.1.0",
+    "purpose": "让前端一启动就有可看的数据：4 个账号各带作品、3 条公有母题、预置审核流水与授权记录、完整溯源链。",
+    "how_it_loads": "app/demo.py 的 DemoStore.reset() 读取本文件；ICH_DEMO_SEED=off 可关闭。",
+    "important": [
+      "★ ai_suggest_level / ai_confidence 不是编的，是 builtin 特征后端（HOG+HSV+Laplacian, 512 维）对这张图算出的真实结果。改了图片就要重新跑一次校验（python -m scripts.check_seed），否则会出现「种子说 derived、实际算出来 public」的漂移。",
+      "asset.file_path 是相对 data/uploads/ 的文件名，由 scripts/make_seed_images.py 生成。",
+      "seed 作品不走 upload→analyze 流程，向量在启动时由 warm_asset_vectors() 现算，算法与线上完全一致。",
+      "所有 right_level 都由「专家终审」产生，不存在 AI 直接写权属的情况；asset 5 演示的是「驳回 → 补充材料 → 再次终审」的完整流转；种子中 is_override 均为 false，推翻 AI 的行为由运行时交互产生，不预置。"
+    ],
+    "stats": {
+      "users": 4,
+      "motifs": 3,
+      "assets": 8,
+      "licenses": 5
+    }
+  },
+  "users": [
+    {
+      "user_id": 1,
+      "username": "heritor01",
+      "display_name": "杨秀英",
+      "role": "heritor",
+      "org_name": "黔东南苗族刺绣传习所",
+      "password": "Passw0rd!"
+    },
+    {
+      "user_id": 2,
+      "username": "expert01",
+      "display_name": "周文渊",
+      "role": "expert",
+      "org_name": "省非物质文化遗产保护中心",
+      "password": "Passw0rd!"
+    },
+    {
+      "user_id": 3,
+      "username": "admin01",
+      "display_name": "陈立",
+      "role": "admin",
+      "org_name": "省文旅厅非遗处",
+      "password": "Passw0rd!"
+    },
+    {
+      "user_id": 4,
+      "username": "heritor02",
+      "display_name": "龙妹银",
+      "role": "heritor",
+      "org_name": "雷山银饰锻制工坊",
+      "password": "Passw0rd!"
+    }
+  ],
+  "motifs": [
+    {
+      "motif_id": 1,
+      "motif_code": "MO-001",
+      "name": "蝴蝶纹",
+      "region": "贵州黔东南",
+      "ethnic": "苗族",
+      "category": "动物纹 / 图腾纹",
+      "era": "明清至今（口传谱系）",
+      "description": "苗族刺绣核心母题。以「蝴蝶妈妈」为原型，象征繁衍、族群认同与祖先崇拜，常与涡纹、花卉纹组合出现，属公有领域传统纹样，任何个人不得独占。",
+      "keywords": [
+        "蝴蝶妈妈",
+        "图腾",
+        "苗绣",
+        "涡纹"
+      ],
+      "reference_img": "motifs/motif_butterfly.jpg"
+    },
+    {
+      "motif_id": 2,
+      "motif_code": "MO-002",
+      "name": "缠枝莲纹",
+      "region": "江苏苏州",
+      "ethnic": "汉族",
+      "category": "植物纹 / 连续纹",
+      "era": "唐宋起源，明清鼎盛",
+      "description": "汉族传统连续纹样，以藤蔓缠绕莲花构成二方或四方连续，明清织物、瓷器、建筑彩画常见，属公有领域。",
+      "keywords": [
+        "缠枝",
+        "连续纹",
+        "莲纹",
+        "苏绣"
+      ],
+      "reference_img": "motifs/motif_lotus.jpg"
+    },
+    {
+      "motif_id": 3,
+      "motif_code": "MO-003",
+      "name": "回纹",
+      "region": "河南洛阳",
+      "ethnic": "汉族",
+      "category": "几何纹 / 边饰纹",
+      "era": "商周青铜器起源",
+      "description": "由横竖折线组成的连续几何纹，形似「回」字，是最古老的公有装饰母题之一，多用于器物边饰与织物地纹。",
+      "keywords": [
+        "几何",
+        "折线",
+        "边饰",
+        "青铜纹"
+      ],
+      "reference_img": "motifs/motif_huiwen.jpg"
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": 1,
+      "title": "苗绣蝴蝶纹袖片（杨氏改良版）",
+      "owner_id": 1,
+      "description": "以传习所祖传蝴蝶纹袖片为底本，将蝶翼由三色改为五色渐变，并在外围增加双线涡纹边框。母题纹样本身来源于本地苗族公共谱系，改良部分（配色与边框构成）为本人独立创作。",
+      "file_path": "seed_butterfly_sleeve.jpg",
+      "right_level": "derived",
+      "audit_status": "approved",
+      "ai_suggest_level": "derived",
+      "ai_confidence": 0.4741,
+      "motif_id": 1,
+      "version_no": 2,
+      "created_days_ago": 42,
+      "decided_days_ago": 39,
+      "audits": [
+        {
+          "state": "pending",
+          "ai_suggest_level": "derived",
+          "ai_confidence": 0.4741,
+          "top_motif_id": 1,
+          "days_ago": 41,
+          "similarity": 0.8349
+        },
+        {
+          "state": "approved",
+          "ai_suggest_level": "derived",
+          "ai_confidence": 0.4741,
+          "expert_level": "derived",
+          "expert_id": 2,
+          "top_motif_id": 1,
+          "is_override": false,
+          "opinion": "与 MO-001 蝴蝶纹相似度 0.8349，落在 [0.80, 0.92) 的改编衍生区间。母题本体属公有谱系，无权独占；申请人对配色方案与边框构成有可辨识的独创性表达，判定为改编衍生，享有演绎著作权。",
+          "days_ago": 41,
+          "decided_days_ago": 39,
+          "similarity": 0.8349
+        }
+      ],
+      "licenses": [
+        {
+          "license_type": "non_exclusive",
+          "licensee_name": "黔东南州文旅商品有限公司",
+          "scope": "文创周边（丝巾、手包、笔记本）生产与销售",
+          "territory": "中国大陆",
+          "start_days_ago": 30,
+          "end_days_ago": -335,
+          "fee_cny": 18000
+        }
+      ]
+    },
+    {
+      "asset_id": 2,
+      "title": "原创鱼纹蜡染方巾",
+      "owner_id": 1,
+      "description": "自绘鱼鸟共生构图，取「鱼跃于渊」之意。与传统母题库做全量比对，最高相似度仅 0.4486，未发现实质重合，主张为原创作品。",
+      "file_path": "seed_fish_scarf.jpg",
+      "right_level": "original",
+      "audit_status": "approved",
+      "ai_suggest_level": "original",
+      "ai_confidence": 0.5691,
+      "motif_id": null,
+      "version_no": 2,
+      "created_days_ago": 28,
+      "decided_days_ago": 25,
+      "audits": [
+        {
+          "state": "pending",
+          "ai_suggest_level": "original",
+          "ai_confidence": 0.5691,
+          "top_motif_id": 1,
+          "days_ago": 27,
+          "similarity": 0.4486
+        },
+        {
+          "state": "approved",
+          "ai_suggest_level": "original",
+          "ai_confidence": 0.5691,
+          "expert_level": "original",
+          "expert_id": 2,
+          "top_motif_id": 1,
+          "is_override": false,
+          "opinion": "最相似母题为 MO-001 蝴蝶纹，相似度 0.4486，远低于 0.80 阈值，构图与纹样组织方式均无实质重合。确认为原创作品，授予完整著作权登记。",
+          "days_ago": 27,
+          "decided_days_ago": 25,
+          "similarity": 0.4486
+        }
+      ],
+      "licenses": [
+        {
+          "license_type": "exclusive",
+          "licensee_name": "贵州苗绣文化传播有限公司",
+          "scope": "全品类独占商业开发（含线上与线下）",
+          "territory": "中国大陆（含港澳台）",
+          "start_days_ago": 20,
+          "end_days_ago": -710,
+          "fee_cny": 68000
+        }
+      ]
+    },
+    {
+      "asset_id": 3,
+      "title": "回纹织锦改良坐垫",
+      "owner_id": 1,
+      "description": "以回纹为地纹，中央加入自创的八瓣折枝花，重构了纹样的疏密节奏。已提交，等待专家终审。",
+      "file_path": "seed_huiwen_cushion.jpg",
+      "right_level": "public",
+      "audit_status": "pending",
+      "ai_suggest_level": "derived",
+      "ai_confidence": 0.419,
+      "motif_id": 3,
+      "version_no": 1,
+      "created_days_ago": 4,
+      "audits": [
+        {
+          "state": "pending",
+          "ai_suggest_level": "derived",
+          "ai_confidence": 0.419,
+          "top_motif_id": 3,
+          "days_ago": 3,
+          "similarity": 0.8059
+        }
+      ],
+      "licenses": []
+    },
+    {
+      "asset_id": 4,
+      "title": "蝴蝶纹样直接复制件",
+      "owner_id": 2,
+      "description": "对传习所藏品蝴蝶纹做了整体描摹复刻，仅调整底色。专家认为不构成实质改编，判定为公有母题。",
+      "file_path": "seed_butterfly_copy.jpg",
+      "right_level": "public",
+      "audit_status": "approved",
+      "ai_suggest_level": "public",
+      "ai_confidence": 0.6356,
+      "motif_id": 1,
+      "version_no": 2,
+      "created_days_ago": 20,
+      "decided_days_ago": 17,
+      "audits": [
+        {
+          "state": "pending",
+          "ai_suggest_level": "public",
+          "ai_confidence": 0.6356,
+          "top_motif_id": 1,
+          "days_ago": 19,
+          "similarity": 0.997
+        },
+        {
+          "state": "approved",
+          "ai_suggest_level": "public",
+          "ai_confidence": 0.6356,
+          "expert_level": "public",
+          "expert_id": 3,
+          "top_motif_id": 1,
+          "is_override": false,
+          "opinion": "与 MO-001 相似度 0.9970，超过 0.92 阈值。整体构图、比例与线描关系均为直接复制，仅底色调整不足以构成独创性表达。判定为公有母题，不予独占。",
+          "days_ago": 19,
+          "decided_days_ago": 17,
+          "similarity": 0.997
+        }
+      ],
+      "licenses": []
+    },
+    {
+      "asset_id": 5,
+      "title": "缠枝莲纹双面绣屏风",
+      "owner_id": 2,
+      "description": "在缠枝莲连续纹基础上重构了单元纹的骨架比例，并采用双面异色绣工艺。AI 判为公有母题，专家终审改判为改编衍生。",
+      "file_path": "seed_lotus_screen.jpg",
+      "right_level": "derived",
+      "audit_status": "approved",
+      "ai_suggest_level": "derived",
+      "ai_confidence": 0.4756,
+      "motif_id": 2,
+      "version_no": 3,
+      "created_days_ago": 55,
+      "decided_days_ago": 50,
+      "audits": [
+        {
+          "state": "pending",
+          "ai_suggest_level": "derived",
+          "ai_confidence": 0.4756,
+          "top_motif_id": 2,
+          "days_ago": 54,
+          "similarity": 0.8783
+        },
+        {
+          "state": "rejected",
+          "ai_suggest_level": "derived",
+          "ai_confidence": 0.4756,
+          "expert_level": "public",
+          "expert_id": 3,
+          "top_motif_id": 2,
+          "opinion": "AI 判定为公有母题，但提交的照片拍摄角度遮挡了绣面工艺特征，材料不足以支撑结论。退回补充细节图与工艺说明。",
+          "days_ago": 54,
+          "decided_days_ago": 53,
+          "similarity": 0.8783
+        },
+        {
+          "state": "pending",
+          "ai_suggest_level": "derived",
+          "ai_confidence": 0.4756,
+          "top_motif_id": 2,
+          "days_ago": 52,
+          "similarity": 0.8783
+        },
+        {
+          "state": "approved",
+          "ai_suggest_level": "derived",
+          "ai_confidence": 0.4756,
+          "expert_level": "derived",
+          "expert_id": 2,
+          "top_motif_id": 2,
+          "is_override": false,
+          "opinion": "补充材料后可见单元纹骨架比例被重新设计，且双面异色绣的针法组织构成新的独创性表达。相似度 0.8783 落在改编衍生区间，判定为改编衍生。",
+          "days_ago": 52,
+          "decided_days_ago": 50,
+          "similarity": 0.8783
+        }
+      ],
+      "licenses": [
+        {
+          "license_type": "display",
+          "licensee_name": "苏州丝绸博物馆",
+          "scope": "馆藏展陈与学术图录使用",
+          "territory": "中国大陆",
+          "start_days_ago": 45,
+          "end_days_ago": -685,
+          "fee_cny": 12000
+        },
+        {
+          "license_type": "non_exclusive",
+          "licensee_name": "云锦织造文创工作室",
+          "scope": "文创衍生开发（不含独占排他）",
+          "territory": "中国大陆",
+          "start_days_ago": 12,
+          "end_days_ago": -353,
+          "fee_cny": 25000
+        }
+      ]
+    },
+    {
+      "asset_id": 6,
+      "title": "银饰回纹錾刻手镯",
+      "owner_id": 4,
+      "description": "以回纹为边饰，镯身錾刻自绘的蝴蝶与缠枝组合纹。等待终审。",
+      "file_path": "seed_silver_bracelet.jpg",
+      "right_level": "public",
+      "audit_status": "pending",
+      "ai_suggest_level": "original",
+      "ai_confidence": 0.537,
+      "motif_id": null,
+      "version_no": 1,
+      "created_days_ago": 2,
+      "audits": [
+        {
+          "state": "pending",
+          "ai_suggest_level": "original",
+          "ai_confidence": 0.537,
+          "top_motif_id": 2,
+          "days_ago": 1,
+          "similarity": 0.6485
+        }
+      ],
+      "licenses": []
+    },
+    {
+      "asset_id": 7,
+      "title": "苗族蝴蝶纹屏风（未提交）",
+      "owner_id": 4,
+      "description": "刚上传，尚未执行 AI 分析。用于演示「草稿」状态与「AI 分析」按钮。",
+      "file_path": "seed_butterfly_screen.jpg",
+      "right_level": "public",
+      "audit_status": "draft",
+      "ai_suggest_level": null,
+      "ai_confidence": null,
+      "motif_id": null,
+      "version_no": 0,
+      "created_days_ago": 1,
+      "audits": [],
+      "licenses": []
+    },
+    {
+      "asset_id": 8,
+      "title": "原创「山间月」纹样手稿",
+      "owner_id": 4,
+      "description": "以月相与山脊线构成抽象纹样，与公有母题库无关联。已终审，登记一笔小规模授权。",
+      "file_path": "seed_moon_valley.jpg",
+      "right_level": "original",
+      "audit_status": "approved",
+      "ai_suggest_level": "original",
+      "ai_confidence": 0.5786,
+      "motif_id": null,
+      "version_no": 2,
+      "created_days_ago": 15,
+      "decided_days_ago": 12,
+      "audits": [
+        {
+          "state": "pending",
+          "ai_suggest_level": "original",
+          "ai_confidence": 0.5786,
+          "top_motif_id": 1,
+          "days_ago": 14,
+          "similarity": 0.2961
+        },
+        {
+          "state": "approved",
+          "ai_suggest_level": "original",
+          "ai_confidence": 0.5786,
+          "expert_level": "original",
+          "expert_id": 2,
+          "top_motif_id": 1,
+          "is_override": false,
+          "opinion": "最高相似度 0.2961（MO-001 蝴蝶纹），属噪声区间，无任何实质呼应。确认为原创作品。",
+          "days_ago": 14,
+          "decided_days_ago": 12,
+          "similarity": 0.2961
+        }
+      ],
+      "licenses": [
+        {
+          "license_type": "non_exclusive",
+          "licensee_name": "雷山文旅发展集团",
+          "scope": "景区导视与文创包装使用",
+          "territory": "贵州省",
+          "start_days_ago": 8,
+          "end_days_ago": -177,
+          "fee_cny": 8600
+        }
+      ]
+    }
+  ]
+}

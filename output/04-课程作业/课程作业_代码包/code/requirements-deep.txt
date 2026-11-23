@@ -1,0 +1,22 @@
+# ---------------------------------------------------------------------------
+#  可选：深度特征后端（CLIP / ResNet）
+#
+#  只有需要更强语义区分力时才安装。下载体积约 2~3 GB，请确认磁盘与网络。
+#  安装后 FEATURE_BACKEND=auto 会自动优先选用 clip，其次 resnet。
+#
+#  首次运行时 open_clip / torchvision 会下载预训练权重：
+#      CLIP ViT-B-32 (openai)      ≈ 350 MB
+#      ResNet-50  (IMAGENET1K_V2)  ≈ 100 MB
+#  离线环境请预先下载权重并用本地路径（见 app/ai/features.py 注释）。
+# ---------------------------------------------------------------------------
+
+# CPU 版 torch（Windows/Linux）。有 GPU 请按官方指引换 index-url 装 CUDA 版。
+torch>=2.1
+torchvision>=0.16
+
+# CLIP 实现（open_clip 比 transformers 轻，接口更直接）
+open_clip_torch>=2.24
+
+# open_clip 的 tokenizer 依赖
+ftfy>=6.1
+regex>=2023.0

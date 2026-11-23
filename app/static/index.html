@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>非遗数字资产分级确权与溯源平台</title>
+<style>
+  /* ===================== 设计令牌 ===================== */
+  :root{
+    --bg:#f6f4ef;            /* 宣纸底色，呼应非遗题材 */
+    --surface:#ffffff;
+    --surface-2:#fbfaf7;
+    --ink:#1c1a17;
+    --ink-2:#57534c;
+    --ink-3:#8c867c;
+    --line:#e5e0d6;
+    --line-strong:#d2cab9;
+    --accent:#8c2f2f;        /* 朱砂红，主强调色 */
+    --accent-soft:#f6e9e7;
+    --indigo:#2c3e5f;        /* 靛蓝，次强调 */
+    --indigo-soft:#e8ecf4;
+    --gold:#a67c2e;
+    --gold-soft:#faf2e0;
+    --green:#2f6b4f;
+    --green-soft:#e6f2ec;
+    --warn:#a35a12;
+    --warn-soft:#fcf0e2;
+    --radius:10px;
+    --radius-sm:6px;
+    --shadow:0 1px 2px rgba(28,26,23,.06), 0 4px 16px rgba(28,26,23,.05);
+    --shadow-lg:0 8px 40px rgba(28,26,23,.12);
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --serif:"Songti SC","SimSun","Source Han Serif SC",Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--ink); font-size:14px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;font-size:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+  a{color:var(--indigo);text-decoration:none}
+
+  /* ===================== 布局 ===================== */
+  .app{display:none;min-height:100vh;flex-direction:column}
+  .app.on{display:flex}
+
+  header.topbar{
+    background:var(--surface); border-bottom:1px solid var(--line);
+    padding:0 28px; height:62px; display:flex; align-items:center; gap:20px;
+    position:sticky; top:0; z-index:100;
+  }
+  .brand{display:flex;align-items:center;gap:11px}
+  .brand-mark{
+    width:34px;height:34px;border-radius:8px;background:var(--accent);
+    display:grid;place-items:center;color:#fff;font-family:var(--serif);font-size:19px;font-weight:600;
+    letter-spacing:0;
+  }
+  .brand-text b{display:block;font-size:15px;letter-spacing:.3px;font-weight:700}
+  .brand-text span{display:block;font-size:11px;color:var(--ink-3);letter-spacing:.5px}
+
+  nav.tabs{display:flex;gap:2px;margin-left:26px}
+  nav.tabs button{
+    padding:8px 15px;border-radius:var(--radius-sm);color:var(--ink-2);font-weight:500;
+    transition:.15s;white-space:nowrap;
+  }
+  nav.tabs button:hover{background:var(--surface-2);color:var(--ink)}
+  nav.tabs button.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+  .userbox{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .who{text-align:right;line-height:1.3}
+  .who b{display:block;font-size:13px}
+  .who span{font-size:11px;color:var(--ink-3)}
+  .avatar{
+    width:34px;height:34px;border-radius:50%;background:var(--indigo-soft);
+    color:var(--indigo);display:grid;place-items:center;font-weight:700;font-size:13px;
+  }
+  .btn{
+    padding:7px 14px;border-radius:var(--radius-sm);font-weight:500;
+    border:1px solid var(--line-strong); background:var(--surface);transition:.15s;
+  }
+  .btn:hover{border-color:var(--ink-3);background:var(--surface-2)}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.primary:hover{background:#7a2727;border-color:#7a2727}
+  .btn.ghost{border-color:transparent;color:var(--ink-2)}
+  .btn.ghost:hover{background:var(--surface-2);color:var(--ink)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  main{flex:1;padding:26px 28px 60px;max-width:1440px;width:100%;margin:0 auto}
+  .page{display:none}
+  .page.on{display:block;animation:fade .22s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  .page-head{margin-bottom:20px}
+  .page-head h1{font-family:var(--serif);font-size:23px;font-weight:600;letter-spacing:.5px}
+  .page-head p{color:var(--ink-2);font-size:13px;margin-top:4px;max-width:760px}
+
+  /* ===================== 卡片 / 网格 ===================== */
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;box-shadow:var(--shadow);
+  }
+  .card h2{font-size:14px;font-weight:650;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card .sub{font-size:12px;color:var(--ink-3);margin-bottom:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .grid-side{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:18px;align-items:start}
+
+  /* ===================== 表单 ===================== */
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:5px}
+  .field label .req{color:var(--accent)}
+  .field input[type=text],.field input[type=number],.field input[type=date],.field select,.field textarea{
+    width:100%;padding:8px 11px;border:1px solid var(--line-strong);border-radius:var(--radius-sm);
+    background:var(--surface);transition:.15s;
+  }
+  .field input:focus,.field select:focus,.field textarea:focus{
+    outline:none;border-color:var(--indigo);box-shadow:0 0 0 3px rgba(44,62,95,.1);
+  }
+  .field textarea{resize:vertical;min-height:64px}
+  .hint{font-size:11px;color:var(--ink-3);margin-top:4px}
+
+  /* ===================== 上传 ===================== */
+  .dropzone{
+    border:2px dashed var(--line-strong);border-radius:var(--radius);padding:26px 20px;
+    text-align:center;transition:.18s;background:var(--surface-2);cursor:pointer;
+  }
+  .dropzone:hover,.dropzone.drag{border-color:var(--accent);background:var(--accent-soft)}
+  .dropzone .dz-icon{font-size:26px;color:var(--ink-3);margin-bottom:6px}
+  .dropzone b{display:block;font-size:13px;margin-bottom:2px}
+  .dropzone span{font-size:12px;color:var(--ink-3)}
+  #previewWrap{display:none;margin-top:14px}
+  #previewWrap.on{display:block}
+  #previewImg{width:100%;max-height:230px;object-fit:contain;border-radius:var(--radius-sm);
+    border:1px solid var(--line);background:#fff}
+  .filemeta{display:flex;gap:14px;font-size:11px;color:var(--ink-3);margin-top:7px;font-family:var(--mono);flex-wrap:wrap}
+
+  /* ===================== 徽章 ===================== */
+  .badge{
+    display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;
+    font-size:11px;font-weight:600;letter-spacing:.2px;white-space:nowrap;
+  }
+  .badge.public{background:var(--indigo-soft);color:var(--indigo)}
+  .badge.derived{background:var(--gold-soft);color:var(--gold)}
+  .badge.original{background:var(--green-soft);color:var(--green)}
+  .badge.draft{background:#eeede9;color:var(--ink-2)}
+  .badge.pending{background:var(--warn-soft);color:var(--warn)}
+  .badge.approved{background:var(--green-soft);color:var(--green)}
+  .badge.rejected{background:var(--accent-soft);color:var(--accent)}
+  .badge.gray{background:#eeede9;color:var(--ink-2)}
+  .badge.outline{background:transparent;border:1px solid var(--line-strong);color:var(--ink-2)}
+
+  /* ===================== 表格 ===================== */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{
+    text-align:left;font-size:11px;font-weight:650;color:var(--ink-3);
+    text-transform:uppercase;letter-spacing:.6px;padding:9px 12px;
+    border-bottom:1px solid var(--line-strong);white-space:nowrap;
+  }
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody tr{transition:.12s}
+  tbody tr:hover{background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:none}
+  td.num{font-family:var(--mono);font-size:12px;text-align:right}
+  .tbl-wrap{overflow-x:auto;margin:0 -20px;padding:0 20px}
+
+  /* ===================== 相似度条 ===================== */
+  .simbars{display:flex;flex-direction:column;gap:9px}
+  .simb{display:grid;grid-template-columns:1fr 54px;gap:10px;align-items:center}
+  .simb .lab{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}
+  .simb .lab b{font-weight:600}
+  .simb .lab span{color:var(--ink-3);font-family:var(--mono);font-size:11px}
+  .bar{height:6px;border-radius:3px;background:#eeede9;overflow:hidden;position:relative}
+  .bar i{display:block;height:100%;border-radius:3px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+  .bar i.hi{background:var(--accent)}
+  .bar i.mid{background:var(--gold)}
+  .bar i.lo{background:var(--green)}
+  .thline{position:absolute;top:-2px;width:1px;height:10px;background:var(--ink-3);opacity:.5}
+
+  /* ===================== 溯源时间轴 ===================== */
+  .timeline{position:relative;padding-left:26px}
+  .timeline::before{
+    content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;
+    background:linear-gradient(180deg,var(--line-strong),var(--line));
+  }
+  .tl-item{position:relative;padding-bottom:20px}
+  .tl-item:last-child{padding-bottom:0}
+  .tl-dot{
+    position:absolute;left:-26px;top:4px;width:18px;height:18px;border-radius:50%;
+    background:var(--surface);border:2px solid var(--line-strong);display:grid;place-items:center;
+    font-size:9px;color:var(--ink-3);font-weight:700;z-index:1;
+  }
+  .tl-item.root .tl-dot{border-color:var(--indigo);color:var(--indigo);background:var(--indigo-soft)}
+  .tl-item.audit .tl-dot{border-color:var(--gold);color:var(--gold);background:var(--gold-soft)}
+  .tl-item.license .tl-dot{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .tl-item.system_log .tl-dot{border-color:var(--ink-3);color:var(--ink-3);background:#eeede9}
+  .tl-body{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:11px 13px}
+  .tl-head{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-bottom:4px}
+  .tl-head b{font-size:13px}
+  .tl-head time{font-size:11px;color:var(--ink-3);font-family:var(--mono);margin-left:auto}
+  .tl-meta{font-size:11px;color:var(--ink-3);margin-bottom:6px}
+  pre.json{
+    background:#1c1a17;color:#e8e3d8;padding:10px 12px;border-radius:var(--radius-sm);
+    font-family:var(--mono);font-size:11px;line-height:1.55;overflow-x:auto;margin-top:6px;
+    max-height:200px;
+  }
+  details summary{cursor:pointer;font-size:11px;color:var(--ink-3);user-select:none;outline:none}
+  details summary:hover{color:var(--ink-2)}
+
+  /* ===================== 统计卡 ===================== */
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 17px;box-shadow:var(--shadow)}
+  .stat .k{font-size:11px;color:var(--ink-3);font-weight:600;letter-spacing:.4px;margin-bottom:5px}
+  .stat .v{font-size:25px;font-weight:700;font-family:var(--serif);line-height:1.15}
+  .stat .v small{font-size:12px;font-weight:500;color:var(--ink-3);margin-left:3px;font-family:inherit}
+  .stat .x{font-size:11px;color:var(--ink-3);margin-top:3px}
+
+  /* ===================== 登录 ===================== */
+  #loginScreen{
+    min-height:100vh;display:grid;place-items:center;padding:24px;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(140,47,47,.07), transparent 42%),
+      radial-gradient(circle at 85% 78%, rgba(44,62,95,.08), transparent 45%),
+      var(--bg);
+  }
+  .login-card{
+    width:100%;max-width:410px;background:var(--surface);border:1px solid var(--line);
+    border-radius:14px;padding:34px 32px;box-shadow:var(--shadow-lg);
+  }
+  .login-card .logo{display:flex;align-items:center;gap:11px;margin-bottom:22px}
+  .login-card h1{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:.4px;margin-bottom:5px}
+  .login-card .lead{font-size:12.5px;color:var(--ink-2);margin-bottom:22px;line-height:1.65}
+  .quick{display:flex;flex-direction:column;gap:7px;margin-top:18px}
+  .quick .qrow{
+    display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);
+    border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;transition:.14s;
+    text-align:left;width:100%;
+  }
+  .quick .qrow:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .quick .qrow b{font-size:12.5px;display:block}
+  .quick .qrow span{font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+  .quick .qrole{font-size:10px;padding:2px 7px;border-radius:10px;margin-left:auto;font-weight:600}
+  .err{
+    background:var(--accent-soft);color:var(--accent);border:1px solid #e8c9c6;
+    padding:9px 12px;border-radius:var(--radius-sm);font-size:12.5px;margin-bottom:14px;
+  }
+  .err:empty{display:none}
+
+  /* ===================== 提示 / 空态 / 加载 ===================== */
+  .empty{text-align:center;padding:44px 20px;color:var(--ink-3);font-size:13px}
+  .empty .ico{font-size:32px;opacity:.35;margin-bottom:8px}
+  .spin{
+    width:15px;height:15px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;
+    border-radius:50%;display:inline-block;animation:rot .7s linear infinite;vertical-align:-3px;
+  }
+  .spin.dark{border-color:rgba(28,26,23,.18);border-top-color:var(--ink-2)}
+  @keyframes rot{to{transform:rotate(360deg)}}
+
+  /* ===================== 演示模式横幅 ===================== */
+  .demo-banner{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:9px 16px;background:#B3261E;color:#fff;
+    font-size:12px;line-height:1.6;position:relative;z-index:60;
+  }
+  .demo-banner b{font-weight:700;text-decoration:underline;text-underline-offset:2px}
+  .demo-banner code{
+    background:rgba(255,255,255,.18);padding:1px 5px;border-radius:3px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;
+  }
+  .demo-banner .demo-tag{
+    flex:0 0 auto;background:#fff;color:#B3261E;font-weight:700;
+    padding:1px 7px;border-radius:3px;font-size:11px;letter-spacing:.5px;
+  }
+  #demoBannerText{flex:1}
+  #demoBannerClose{
+    flex:0 0 auto;background:transparent;border:0;color:#fff;font-size:19px;
+    line-height:1;cursor:pointer;opacity:.75;padding:0 2px;
+  }
+  #demoBannerClose:hover{opacity:1}
+
+  #toasts{position:fixed;bottom:22px;right:22px;display:flex;flex-direction:column;gap:9px;z-index:9999}
+  .toast{
+    background:var(--ink);color:#fff;padding:11px 16px;border-radius:var(--radius-sm);
+    font-size:12.5px;box-shadow:var(--shadow-lg);max-width:380px;
+    animation:slidein .25s ease;line-height:1.5;
+  }
+  .toast.ok{background:var(--green)}
+  .toast.bad{background:var(--accent)}
+  @keyframes slidein{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+  /* ===================== 模态 ===================== */
+  .modal-bg{
+    position:fixed;inset:0;background:rgba(28,26,23,.45);backdrop-filter:blur(3px);
+    display:none;place-items:center;z-index:1000;padding:24px;
+  }
+  .modal-bg.on{display:grid}
+  .modal{
+    background:var(--surface);border-radius:12px;width:100%;max-width:760px;
+    max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:pop .2s ease;
+  }
+  @keyframes pop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+  .modal-hd{
+    padding:17px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;
+    position:sticky;top:0;background:var(--surface);z-index:2;border-radius:12px 12px 0 0;
+  }
+  .modal-hd h3{font-family:var(--serif);font-size:17px;font-weight:600}
+  .modal-hd .close{margin-left:auto;font-size:20px;color:var(--ink-3);line-height:1;padding:0 4px}
+  .modal-hd .close:hover{color:var(--ink)}
+  .modal-bd{padding:22px}
+
+  /* ===================== AI 建议面板 ===================== */
+  .ai-panel{
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:18px;
+  }
+  .ai-panel .hd{
+    padding:11px 15px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--surface-2);border-bottom:1px solid var(--line);
+  }
+  .ai-panel .hd b{font-size:13px}
+  .ai-panel .hd .tag{
+    font-size:10px;padding:2px 7px;border-radius:4px;background:var(--accent);
+    color:#fff;font-weight:700;letter-spacing:.5px;
+  }
+  .ai-panel .bd{padding:15px}
+  .ai-panel .reason{font-size:12.5px;color:var(--ink-2);line-height:1.7;background:var(--surface-2);
+    padding:10px 13px;border-radius:var(--radius-sm);border-left:3px solid var(--accent)}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:12px;margin-top:11px}
+  .kv dt{color:var(--ink-3);white-space:nowrap}
+  .kv dd{font-family:var(--mono);font-size:11.5px;word-break:break-all}
+
+  .warn-box{
+    background:var(--warn-soft);border:1px solid #f0d9bb;border-radius:var(--radius-sm);
+    padding:10px 13px;font-size:12px;color:var(--warn);line-height:1.6;margin-bottom:14px;
+  }
+  .ok-box{
+    background:var(--green-soft);border:1px solid #c9e3d5;border-radius:var(--radius-sm);
+    padding:10px 13px;font-size:12px;color:var(--green);line-height:1.6;margin-bottom:14px;
+  }
+  .code-inline{
+    font-family:var(--mono);font-size:11px;background:#eeede9;padding:1px 5px;border-radius:3px;
+  }
+
+  .radio-cards{display:flex;flex-direction:column;gap:8px}
+  .radio-card{
+    display:flex;align-items:flex-start;gap:11px;padding:11px 13px;border:1px solid var(--line-strong);
+    border-radius:var(--radius-sm);cursor:pointer;transition:.15s;background:var(--surface);
+  }
+  .radio-card:hover{border-color:var(--ink-3)}
+  .radio-card.sel{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent) inset}
+  .radio-card input{margin-top:3px;accent-color:var(--accent)}
+  .radio-card b{font-size:13px;display:block}
+  .radio-card span{font-size:11.5px;color:var(--ink-2);display:block;margin-top:1px}
+  .radio-card .rec{font-size:10px;padding:1px 6px;border-radius:8px;background:var(--indigo);
+    color:#fff;margin-left:6px;vertical-align:1px}
+
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+  .seg{display:flex;border:1px solid var(--line-strong);border-radius:var(--radius-sm);overflow:hidden}
+  .seg button{padding:6px 13px;font-size:12px;color:var(--ink-2);border-right:1px solid var(--line-strong)}
+  .seg button:last-child{border-right:none}
+  .seg button.on{background:var(--ink);color:#fff}
+
+  /* ===================== 母题库 ===================== */
+  .motif-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .motif-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    overflow:hidden;box-shadow:var(--shadow);transition:.18s;display:flex;flex-direction:column;
+  }
+  .motif-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);border-color:var(--line-strong)}
+  .motif-thumb{
+    position:relative;aspect-ratio:1/1;background:var(--surface-2);overflow:hidden;
+    border-bottom:1px solid var(--line);
+  }
+  .motif-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .motif-thumb .no-img{
+    width:100%;height:100%;display:grid;place-items:center;color:var(--ink-3);
+    font-size:12px;background:repeating-linear-gradient(45deg,#f3f1ec,#f3f1ec 8px,#eceae4 8px,#eceae4 16px);
+  }
+  .motif-thumb .code{
+    position:absolute;top:9px;left:9px;background:rgba(28,26,23,.78);color:#fff;
+    font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:4px;letter-spacing:.4px;
+  }
+  .motif-thumb .vec-flag{
+    position:absolute;top:9px;right:9px;background:rgba(47,107,79,.9);color:#fff;
+    font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600;
+  }
+  .motif-thumb .vec-flag.off{background:rgba(140,134,124,.9)}
+  .motif-body{padding:14px 16px 16px;flex:1;display:flex;flex-direction:column;gap:9px}
+  .motif-body h3{font-family:var(--serif);font-size:17px;font-weight:600;letter-spacing:.3px}
+  .motif-body .meta{display:flex;flex-wrap:wrap;gap:5px}
+  .chip{
+    font-size:10.5px;padding:2px 8px;border-radius:10px;background:var(--surface-2);
+    border:1px solid var(--line);color:var(--ink-2);white-space:nowrap;
+  }
+  .chip.indigo{background:var(--indigo-soft);border-color:#d3dced;color:var(--indigo)}
+  .chip.gold{background:var(--gold-soft);border-color:#efe0c4;color:var(--gold)}
+  .motif-body .desc{
+    font-size:12px;color:var(--ink-2);line-height:1.7;flex:1;
+    display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .motif-kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11px;
+    border-top:1px dashed var(--line);padding-top:9px}
+  .motif-kv dt{color:var(--ink-3);white-space:nowrap}
+  .motif-kv dd{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);word-break:break-all}
+  .motif-kv dd b{font-family:inherit;font-size:11.5px;color:var(--accent)}
+
+  /* 母题库顶部说明 */
+  .explain{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);
+    border-radius:var(--radius);overflow:hidden;background:var(--surface);margin-bottom:18px}
+  .explain .step{padding:15px 17px;border-right:1px solid var(--line);position:relative}
+  .explain .step:last-child{border-right:none}
+  .explain .step .n{
+    font-family:var(--mono);font-size:10px;color:#fff;background:var(--indigo);
+    width:17px;height:17px;border-radius:50%;display:inline-grid;place-items:center;
+    font-weight:700;margin-bottom:7px;
+  }
+  .explain .step b{display:block;font-size:12.5px;margin-bottom:3px}
+  .explain .step span{font-size:11.5px;color:var(--ink-3);line-height:1.6;display:block}
+  .explain .step .arrow{
+    position:absolute;right:-7px;top:50%;transform:translateY(-50%);z-index:2;
+    color:var(--line-strong);font-size:13px;background:var(--surface);line-height:1;
+  }
+
+  @media(max-width:1080px){
+    .grid-side{grid-template-columns:1fr}
+    .grid3{grid-template-columns:repeat(2,1fr)}
+    .explain{grid-template-columns:repeat(2,1fr)}
+    .explain .step:nth-child(2){border-right:none}
+    .explain .step:nth-child(1),.explain .step:nth-child(2){border-bottom:1px solid var(--line)}
+    .explain .step .arrow{display:none}
+  }
+  @media(max-width:720px){
+    main{padding:18px 14px 50px}
+    header.topbar{padding:0 14px;gap:10px;height:auto;flex-wrap:wrap;padding-top:9px;padding-bottom:9px}
+    nav.tabs{margin-left:0;order:3;width:100%;overflow-x:auto}
+    .grid2,.grid3{grid-template-columns:1fr}
+    .explain{grid-template-columns:1fr}
+    .explain .step{border-right:none;border-bottom:1px solid var(--line)}
+    .explain .step:last-child{border-bottom:none}
+    .motif-grid{grid-template-columns:1fr}
+    .who{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== 登录 ==================== -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="logo">
+      <div class="brand-mark">遗</div>
+      <div class="brand-text"><b>非遗数字资产确权平台</b><span>ICH Digital Asset Ledger</span></div>
+    </div>
+    <h1>分级确权 · 可信溯源</h1>
+    <p class="lead">
+      以 AI 特征比对辅助区分「公有传统母题 / 改编衍生 / 全新原创」，
+      由专家终审确权，授权流转全程留痕可溯。
+    </p>
+    <div class="err" id="loginErr"></div>
+    <div class="field">
+      <label>账号</label>
+      <input type="text" id="loginUser" placeholder="heritor01 / expert01 / admin01" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>口令</label>
+      <input type="password" id="loginPass" placeholder="Passw0rd!" autocomplete="current-password">
+    </div>
+    <button class="btn primary" style="width:100%;padding:10px" id="loginBtn">登 录</button>
+
+    <div class="quick" id="quickLogin">
+      <div style="font-size:11px;color:var(--ink-3);font-weight:600;letter-spacing:.5px;margin-bottom:1px">
+        演示账号（点击直填）
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 主应用 ==================== -->
+<div class="app" id="app">
+  <!-- 演示模式横幅：由 /api/meta 的 demo_mode 控制，默认隐藏 -->
+  <div id="demoBanner" class="demo-banner" hidden>
+    <span class="demo-tag">演示模式</span>
+    <span id="demoBannerText">
+      当前数据存放在进程内存中，<b>不是真实 PostgreSQL</b>；退出即丢失。
+      列级 GRANT、触发器、CHECK/UNIQUE/外键、HNSW 近似检索、MVCC 并发控制<b>均不生效</b>。
+      设 <code>ICH_DEMO_MODE=0</code> 并启动数据库即可切换到真实模式。
+    </span>
+    <button id="demoBannerClose" title="收起">×</button>
+  </div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">遗</div>
+      <div class="brand-text"><b>非遗数字资产确权平台</b><span>ICH Digital Asset Ledger</span></div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-page="upload" class="active">作品上传</button>
+      <button data-page="motifs" id="tabMotifs">母题库</button>
+      <button data-page="mine" id="tabMine">我的作品</button>
+      <button data-page="workbench" id="tabWorkbench">专家工作台</button>
+      <button data-page="ledger" id="tabLedger">监管台账</button>
+    </nav>
+    <div class="userbox">
+      <div class="who"><b id="uName">—</b><span id="uRole">—</span></div>
+      <div class="avatar" id="uAvatar">—</div>
+      <button class="btn ghost" id="logoutBtn">退出</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ---------- 上传 ---------- -->
+    <section class="page on" id="page-upload">
+      <div class="page-head">
+        <h1>作品上传与 AI 预审</h1>
+        <p>上传非遗纹样作品后，系统自动提取 512 维视觉特征，在公有母题库中做 HNSW 近邻检索，给出分级建议。AI 结论仅作参考，最终确权由专家决定。</p>
+      </div>
+      <div class="grid-side">
+        <div class="card">
+          <h2>① 上传作品</h2>
+          <div class="sub">支持 JPG / PNG / WEBP / BMP / TIFF，单张不超过 20MB</div>
+
+          <div class="dropzone" id="dropzone">
+            <div class="dz-icon">＋</div>
+            <b>点击选择图片，或拖拽到此处</b>
+            <span>建议上传清晰、单幅的纹样图</span>
+            <input type="file" id="fileInput" accept="image/*" style="display:none">
+          </div>
+
+          <div id="previewWrap">
+            <img id="previewImg" alt="预览">
+            <div class="filemeta">
+              <span id="fmName">—</span>
+              <span id="fmSize">—</span>
+              <span id="fmDim">—</span>
+            </div>
+          </div>
+
+          <div style="height:16px"></div>
+          <div class="field">
+            <label>作品名称 <span class="req">*</span></label>
+            <input type="text" id="upTitle" placeholder="例如：苗绣蝴蝶纹袖片（杨氏改良版）">
+          </div>
+          <div class="field">
+            <label>创作说明</label>
+            <textarea id="upDesc" placeholder="说明创作缘起、母题来源、改良内容等，供专家参考"></textarea>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:18px">
+            <button class="btn primary" id="uploadBtn" style="flex:1;padding:10px">上传并触发 AI 分析</button>
+          </div>
+          <div class="hint" style="margin-top:9px">
+            上传后自动执行：特征提取 → 向量检索 → 分级建议 → 进入专家待审队列
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card">
+            <h2>② AI 分析结果</h2>
+            <div class="sub">实时展示特征提取与相似度比对过程</div>
+            <div id="analyzeBox">
+              <div class="empty"><div class="ico">◍</div>上传作品后，此处显示 AI 预审报告</div>
+            </div>
+          </div>
+          <div class="card" style="padding:15px 18px">
+            <h2 style="font-size:12px;margin-bottom:9px">分级依据</h2>
+            <div style="font-size:12px;color:var(--ink-2);line-height:1.85">
+              设 <span class="code-inline">s</span> = 与最相似公有母题的余弦相似度：<br>
+              <span class="badge public" style="margin:3px 0">s ≥ 0.92</span> 高度重合 → 建议判为<b>公有母题</b><br>
+              <span class="badge derived" style="margin:3px 0">0.80 ≤ s &lt; 0.92</span> 实质借鉴 → 建议判为<b>改编衍生</b><br>
+              <span class="badge original" style="margin:3px 0">s &lt; 0.80</span> 无实质重合 → 倾向<b>原创</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 我的作品 ---------- -->
+    <section class="page" id="page-mine">
+      <div class="page-head">
+        <h1>我的作品</h1>
+        <p>查看已提交作品的确权进度、AI 建议与专家结论。已确权作品可登记对外授权。</p>
+      </div>
+      <div class="card">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>作品名称</th><th>AI 建议</th><th>专家结论</th><th>状态</th>
+              <th>版本</th><th>创建时间</th><th style="text-align:right">操作</th>
+            </tr></thead>
+            <tbody id="mineBody"><tr><td colspan="8"><div class="empty">加载中…</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 母题库 ---------- -->
+    <section class="page" id="page-motifs">
+      <div class="page-head">
+        <h1>公有母题库</h1>
+        <p>母题库是分级判定的<b>比对基准</b>：每件上传作品都会与本库做向量近邻检索，最高相似度决定它落在哪一档。库中纹样均属公有领域传统母题，任何个人不得独占。数据来自 <span class="code-inline">public_motif</span> 表。</p>
+      </div>
+
+      <div class="explain">
+        <div class="step">
+          <span class="n">1</span><b>母题入库</b>
+          <span>参考图落盘后提 512 维视觉特征，写入 <span class="code-inline">base_vector</span></span>
+          <span class="arrow">›</span>
+        </div>
+        <div class="step">
+          <span class="n">2</span><b>作品提特征</b>
+          <span>上传作品走同一套 AI 后端，保证向量空间可比</span>
+          <span class="arrow">›</span>
+        </div>
+        <div class="step">
+          <span class="n">3</span><b>近邻检索</b>
+          <span>真库用 HNSW 索引做余弦近邻；演示模式退化为精确全量扫描</span>
+          <span class="arrow">›</span>
+        </div>
+        <div class="step">
+          <span class="n">4</span><b>阈值分级</b>
+          <span>≥0.92 公有母题　·　0.80–0.92 改编衍生　·　&lt;0.80 倾向原创</span>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="seg" id="motifFilter">
+          <button data-f="all" class="on">全部母题</button>
+          <button data-f="referenced">已被作品引用</button>
+          <button data-f="unreferenced">暂未被引用</button>
+        </div>
+        <div style="margin-left:auto;font-size:12px;color:var(--ink-3)" id="motifCount">—</div>
+      </div>
+
+      <div class="motif-grid" id="motifGrid">
+        <div class="empty"><div class="ico">◌</div>加载中…</div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <h2>母题与作品的关联</h2>
+        <div class="sub">表 <span class="code-inline">asset.motif_id</span> 记录「血缘依据」：只想在判定为公有母题或改编衍生时回写，原创作品留空，避免给原创作品无端挂上公有母题的来源</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>母题</th><th>引用作品</th><th>权利人</th><th>权属级别</th>
+              <th>相似度</th><th>AI/专家</th><th style="text-align:right">操作</th>
+            </tr></thead>
+            <tbody id="motifLinkBody">
+              <tr><td colspan="7"><div class="empty">加载中…</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 专家工作台 ---------- -->
+    <section class="page" id="page-workbench">
+      <div class="page-head">
+        <h1>专家工作台</h1>
+        <p>待审列表来自数据库视图 <span class="code-inline">v_asset_pending_audit</span>。请结合 AI 相似度报告与创作说明做终审判定，终审在同一事务内原子写入并自动生成审计日志。</p>
+      </div>
+      <div class="grid3" id="wbStats" style="margin-bottom:18px"></div>
+      <div class="card">
+        <h2>待终审队列</h2>
+        <div class="sub" id="pendingSub">—</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>作品</th><th>权利人</th><th>AI 建议</th><th>置信度</th>
+              <th>最相似母题</th><th>相似度</th><th>提交时间</th><th style="text-align:right">操作</th>
+            </tr></thead>
+            <tbody id="pendingBody"><tr><td colspan="9"><div class="empty">加载中…</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 监管台账 ---------- -->
+    <section class="page" id="page-ledger">
+      <div class="page-head">
+        <h1>监管台账与溯源</h1>
+        <p>台账数据来自视图 <span class="code-inline">v_asset_ledger</span>，溯源链路来自 <span class="code-inline">v_asset_trace_chain</span>。点击任意作品的「溯源」可查看完整权属与授权流转链路。</p>
+      </div>
+      <div class="grid3" id="ledgerStats" style="margin-bottom:18px"></div>
+      <div class="card">
+        <div class="toolbar">
+          <div class="seg" id="ledgerFilter">
+            <button data-f="all" class="on">全部</button>
+            <button data-f="public">公有母题</button>
+            <button data-f="derived">改编衍生</button>
+            <button data-f="original">原创作品</button>
+          </div>
+          <div style="margin-left:auto;font-size:12px;color:var(--ink-3)" id="ledgerCount">—</div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>作品</th><th>权利人</th><th>权属级别</th><th>状态</th>
+              <th>AI 建议</th><th>AI/专家</th><th>母题</th><th>授权</th><th>费用(元)</th>
+              <th>审计条目</th><th style="text-align:right">操作</th>
+            </tr></thead>
+            <tbody id="ledgerBody"><tr><td colspan="12"><div class="empty">加载中…</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ==================== 审核模态 ==================== -->
+<div class="modal-bg" id="auditModal">
+  <div class="modal">
+    <div class="modal-hd">
+      <h3 id="amTitle">终审</h3>
+      <button class="close" data-close="auditModal">×</button>
+    </div>
+    <div class="modal-bd" id="amBody"></div>
+  </div>
+</div>
+
+<!-- ==================== 溯源模态 ==================== -->
+<div class="modal-bg" id="traceModal">
+  <div class="modal">
+    <div class="modal-hd">
+      <h3 id="tmTitle">溯源链路</h3>
+      <button class="close" data-close="traceModal">×</button>
+    </div>
+    <div class="modal-bd" id="tmBody"></div>
+  </div>
+</div>
+
+<!-- ==================== 授权模态 ==================== -->
+<div class="modal-bg" id="licenseModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-hd">
+      <h3>登记授权</h3>
+      <button class="close" data-close="licenseModal">×</button>
+    </div>
+    <div class="modal-bd" id="lmBody"></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

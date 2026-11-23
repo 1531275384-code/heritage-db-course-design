@@ -1,0 +1,9 @@
+﻿asset_id,title,owner_id,owner_name,motif_id,motif_code,right_level,audit_status,ai_suggest_level,ai_confidence,version_no,file_path,审核条数,授权笔数,授权费合计,description
+1,苗绣蝴蝶纹袖片（杨氏改良版）,1,杨秀英,1,MO-001,derived,approved,derived,0.4741,2,seed_butterfly_sleeve.jpg,2,1,18000.0,以传习所祖传蝴蝶纹袖片为底本，将蝶翼由三色改为五色渐变，并在外围增加双线涡纹边框。母题纹样本身来源于本地苗族公共谱系，改良部分（配色与边框构成）为本人独立创作。
+2,原创鱼纹蜡染方巾,1,杨秀英,,,original,approved,original,0.5691,2,seed_fish_scarf.jpg,2,1,68000.0,自绘鱼鸟共生构图，取「鱼跃于渊」之意。与传统母题库做全量比对，最高相似度仅 0.4486，未发现实质重合，主张为原创作品。
+3,回纹织锦改良坐垫,1,杨秀英,3,MO-003,public,pending,derived,0.419,1,seed_huiwen_cushion.jpg,1,0,0,以回纹为地纹，中央加入自创的八瓣折枝花，重构了纹样的疏密节奏。已提交，等待专家终审。
+4,蝴蝶纹样直接复制件,2,周文渊,1,MO-001,public,approved,public,0.6356,2,seed_butterfly_copy.jpg,2,0,0,对传习所藏品蝴蝶纹做了整体描摹复刻，仅调整底色。专家认为不构成实质改编，判定为公有母题。
+5,缠枝莲纹双面绣屏风,2,周文渊,2,MO-002,derived,approved,derived,0.4756,3,seed_lotus_screen.jpg,4,2,37000.0,在缠枝莲连续纹基础上重构了单元纹的骨架比例，并采用双面异色绣工艺。AI 判为公有母题，专家终审改判为改编衍生。
+6,银饰回纹錾刻手镯,4,龙妹银,,,public,pending,original,0.537,1,seed_silver_bracelet.jpg,1,0,0,以回纹为边饰，镯身錾刻自绘的蝴蝶与缠枝组合纹。等待终审。
+7,苗族蝴蝶纹屏风（未提交）,4,龙妹银,,,public,draft,,,0,seed_butterfly_screen.jpg,0,0,0,刚上传，尚未执行 AI 分析。用于演示「草稿」状态与「AI 分析」按钮。
+8,原创「山间月」纹样手稿,4,龙妹银,,,original,approved,original,0.5786,2,seed_moon_valley.jpg,2,1,8600.0,以月相与山脊线构成抽象纹样，与公有母题库无关联。已终审，登记一笔小规模授权。

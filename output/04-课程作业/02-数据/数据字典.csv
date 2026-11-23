@@ -1,0 +1,135 @@
+﻿命名空间,对象,字段,类型,是否必填,含义
+seed JSON,users,user_id,整数,是,主键，取值为 1–4；被 asset.owner_id、audit_record.expert_id 引用
+seed JSON,users,username,字符串,是,"登录名，全局唯一，格式 ^[a-zA-Z0-9_]{3,64}$"
+seed JSON,users,display_name,字符串,是,中文姓名，用于界面展示与专家署名
+seed JSON,users,role,枚举,是,heritor 传承人 / expert 评审专家 / admin 监管管理员，决定可用功能与数据范围
+seed JSON,users,org_name,字符串,否,所属单位；本数据中为传习所、评审机构、文旅主管部门
+seed JSON,users,password,字符串,是,演示用明文口令，四账号均为 Passw0rd!。灌入真库时转 bcrypt 散列，明文不入库
+seed JSON,motifs,motif_id,整数,是,主键，1–3；被 asset.motif_id 引用
+seed JSON,motifs,motif_code,字符串,是,母题编号，形如 MO-001，全局唯一，是检索结果里给人看的那一列
+seed JSON,motifs,name,字符串,是,母题名称，如蝴蝶纹、缠枝莲纹、回纹
+seed JSON,motifs,region,字符串,否,主要流传地域，用于说明公有领域的地域属性
+seed JSON,motifs,ethnic,字符串,否,关联民族。★ 种子文件独有字段，public_motif 表无对应列，灌库时忽略
+seed JSON,motifs,category,字符串,否,纹样类别，如动物纹 / 图腾纹。★ 同上，仅前端展示用
+seed JSON,motifs,era,字符串,否,年代或口传谱系说明。★ 同上，仅前端展示用
+seed JSON,motifs,description,字符串,是,母题释义，写明「属公有领域，任何人不得独占」的法律属性
+seed JSON,motifs,keywords,字符串数组,否,关键词，用于界面标签与人工检索。★ 同上，表结构无此列
+seed JSON,motifs,reference_img,字符串,是,参考图相对路径，相对 data/ 目录，如 motifs/motif_butterfly.jpg
+seed JSON,assets,asset_id,整数,是,主键，1–8；审核流水与授权记录都挂在它下面
+seed JSON,assets,title,字符串,是,作品名称，含作者与工艺特征，便于人工核对
+seed JSON,assets,owner_id,整数,是,权利人（传承人）的 user_id，外键指向 users
+seed JSON,assets,description,字符串,是,创作说明：改了什么、独创性在哪、母题血缘是什么。这是专家终审的主要依据
+seed JSON,assets,file_path,字符串,是,图片文件名，相对 data/uploads/；由 make_seed_images.py 生成
+seed JSON,assets,right_level,枚举,是,终审结论，public / derived / original。★ 只能由专家终审写入，AI 无此权限
+seed JSON,assets,audit_status,枚举,是,流转状态，draft / pending / approved / rejected
+seed JSON,assets,ai_suggest_level,枚举,否,AI 建议级别，算法算出的结果，仅供专家参考
+seed JSON,assets,ai_confidence,小数,否,AI 建议的置信度，0–1，与相似度不是一回事（见 4.4 节说明）
+seed JSON,assets,motif_id,整数,否,关联的公有母题 id；为空表示无母题血缘（原创或未识别）
+seed JSON,assets,version_no,整数,是,版本号，每次终审或变更 +1，用于并发冲突检测
+seed JSON,assets,created_days_ago,整数,是,距今天数，用于生成 created_at，避免把绝对日期写死
+seed JSON,assets,decided_days_ago,整数,否,距今多少天完成终审；为空表示尚未终审
+seed JSON,assets,audits,对象数组,是,审核流水，见下表；按时间先后排列，可有多条
+seed JSON,assets,licenses,对象数组,是,授权记录，见下表；未授权时为空数组
+seed JSON,assets.audits[],state,枚举,是,本条流水的状态：pending / rejected / approved（表里另有 expert_review）
+seed JSON,assets.audits[],ai_suggest_level,枚举,是,提交当时 AI 给出的建议，快照留存，不随算法更新而变
+seed JSON,assets.audits[],ai_confidence,小数,是,提交当时 AI 建议的置信度
+seed JSON,assets.audits[],top_motif_id,整数,否,AI 认为最相似的公有母题 id
+seed JSON,assets.audits[],similarity,小数,是,与 top_motif_id 对应母题的余弦相似度，0–1
+seed JSON,assets.audits[],expert_level,枚举,否,专家终审结论；待审或驳回记录中可能为空
+seed JSON,assets.audits[],expert_id,整数,否,终审专家 user_id；待审阶段为空
+seed JSON,assets.audits[],is_override,布尔,否,专家是否推翻了 AI 建议。本数据中均为 false，推翻行为在运行时产生
+seed JSON,assets.audits[],opinion,字符串,否,专家意见原文，是真值判断的依据，也用于审计追溯
+seed JSON,assets.audits[],days_ago,整数,否,该条流水距今天数，用于生成 created_at
+seed JSON,assets.audits[],decided_days_ago,整数,否,决策距今天数，用于生成 decided_at
+seed JSON,assets.licenses[],license_type,枚举,是,exclusive 独占 / non_exclusive 非独占 / display 展示 / derivative 衍生开发
+seed JSON,assets.licenses[],licensee_name,字符串,是,被授权方名称；外部机构不是系统用户，所以用名称而非 user_id
+seed JSON,assets.licenses[],scope,字符串,是,授权范围，写明可做哪些品类、哪些用途
+seed JSON,assets.licenses[],territory,字符串,是,地域范围
+seed JSON,assets.licenses[],start_days_ago,整数,是,起算日距今多少天
+seed JSON,assets.licenses[],end_days_ago,整数,是,到期日距今天数。★ 取负数表示未来日期，如 -335 即 335 天后到期
+seed JSON,assets.licenses[],fee_cny,数值,是,授权费，单位人民币元；台账合计即各条之和
+数据库,app_user,user_id,BIGSERIAL,—,主键，自增。被 asset.owner_id / audit_record.expert_id / license_record 三方引用
+数据库,app_user,username,VARCHAR(64),—,登录名，唯一索引；CHECK 限制为字母数字下划线
+数据库,app_user,display_name,VARCHAR(128),—,显示名
+数据库,app_user,role,user_role_enum,—,角色枚举，决定 RBAC 边界
+数据库,app_user,password_hash,TEXT,—,"口令散列，由 pgcrypto 的 crypt(..., gen_salt('bf',10)) 产出，不存明文"
+数据库,app_user,org_name,VARCHAR(200),—,所属单位
+数据库,app_user,is_active,BOOLEAN,—,是否启用；停用账号保留历史记录不物理删除
+数据库,app_user,created_at,TIMESTAMPTZ,—,创建时间，带时区
+数据库,public_motif,motif_id,BIGSERIAL,—,主键
+数据库,public_motif,motif_code,VARCHAR(32),—,母题编号，唯一；检索结果按此列展示
+数据库,public_motif,name,VARCHAR(128),—,母题名称
+数据库,public_motif,region,VARCHAR(128),—,流传地域
+数据库,public_motif,description,TEXT,—,释义与权属属性说明
+数据库,public_motif,reference_img,VARCHAR(512),—,参考图相对路径
+数据库,public_motif,base_vector,VECTOR(512) 或 NUMERIC[],—,512 维基准向量，L2 归一化；配 HNSW(cosine) 索引
+数据库,public_motif,vector_model,VARCHAR(64),—,产出该向量的模型版本，换模型后可追溯
+数据库,public_motif,created_at,TIMESTAMPTZ,—,入库时间
+数据库,asset,asset_id,BIGSERIAL,—,主键
+数据库,asset,title,VARCHAR(200),—,作品名
+数据库,asset,owner_id,BIGINT,—,外键 → app_user，权利人
+数据库,asset,motif_id,BIGINT,—,外键 → public_motif，可为空（无母题血缘）
+数据库,asset,file_path,VARCHAR(512),—,原图相对路径
+数据库,asset,file_hash,CHAR(64),—,SHA-256，64 位小写十六进制；用于查重与防篡改
+数据库,asset,file_size,BIGINT,—,字节数，CHECK > 0
+数据库,asset,mime_type,VARCHAR(64),—,媒体类型，默认 image/jpeg
+数据库,asset,right_level,right_level_enum,—,★ 终审结论。传承人角色对该列无 UPDATE 权限，AI 进程更无写权限
+数据库,asset,audit_status,audit_status_enum,—,流转状态
+数据库,asset,ai_suggest_level,right_level_enum,—,AI 建议级别，CHECK 与 ai_confidence 成对出现
+数据库,asset,ai_confidence,"NUMERIC(5,4)",—,AI 置信度，0–1
+数据库,asset,ai_model_version,VARCHAR(64),—,产出建议的模型版本
+数据库,asset,version_no,INTEGER,—,乐观锁版本号，终审时 +1
+数据库,asset,description,TEXT,—,创作说明
+数据库,asset,created_at,TIMESTAMPTZ,—,上传时间
+数据库,asset,updated_at,TIMESTAMPTZ,—,末次变更时间，由触发器自动刷新
+数据库,feature_vector,fv_id,BIGSERIAL,—,主键
+数据库,feature_vector,asset_id,BIGINT,—,外键 → asset，1:1 垂直拆分
+数据库,feature_vector,model_name,VARCHAR(64),—,模型名，如 builtin-hog-color-texture
+数据库,feature_vector,model_version,VARCHAR(32),—,模型版本
+数据库,feature_vector,embed_dim,SMALLINT,—,维度，CHECK 恒为 512
+数据库,feature_vector,embedding,VECTOR(512) 或 NUMERIC[],—,L2 归一化向量；维度由 CHECK 兜底
+数据库,feature_vector,created_at,TIMESTAMPTZ,—,写入时间；重算时新增行保留历史
+数据库,audit_record,audit_id,BIGSERIAL,—,主键
+数据库,audit_record,asset_id,BIGINT,—,外键 → asset，ON DELETE RESTRICT 保留证据链
+数据库,audit_record,expert_id,BIGINT,—,外键 → app_user；待审阶段为空，CHECK 保证已决策必有专家
+数据库,audit_record,state,VARCHAR(24),—,流水状态；pending → expert_review → approved / rejected
+数据库,audit_record,ai_suggest_level,right_level_enum,—,AI 建议快照
+数据库,audit_record,ai_confidence,"NUMERIC(5,4)",—,AI 置信度快照
+数据库,audit_record,expert_level,right_level_enum,—,专家终审结论；未决策时 CHECK 要求为空
+数据库,audit_record,similarity_json,JSONB,—,top-K 相似母题快照，JSONB，便于事后复现当时的检索结果
+数据库,audit_record,opinion,TEXT,—,专家意见原文
+数据库,audit_record,is_override,BOOLEAN,—,是否推翻 AI；由服务层在写入时比对 expert_level 与 ai_suggest_level 得出
+数据库,audit_record,created_at,TIMESTAMPTZ,—,流水创建时间
+数据库,audit_record,decided_at,TIMESTAMPTZ,—,决策时间；已决策记录 CHECK 要求非空
+数据库,license_record,license_id,BIGSERIAL,—,主键
+数据库,license_record,asset_id,BIGINT,—,外键 → asset
+数据库,license_record,licensor_id,BIGINT,—,外键 → app_user，授权方（通常为权利人本人）
+数据库,license_record,licensee_user_id,BIGINT,—,外键 → app_user，被授权方是系统内用户时填
+数据库,license_record,licensee_name,VARCHAR(200),—,被授权方名称，外部机构用这一列；CHECK 要求二者至少填一个
+数据库,license_record,license_type,VARCHAR(32),—,四种取值，见枚举表
+数据库,license_record,scope,TEXT,—,授权范围
+数据库,license_record,territory,VARCHAR(128),—,地域
+数据库,license_record,start_date,DATE,—,起算日
+数据库,license_record,end_date,DATE,—,到期日；CHECK 要求不早于起算日
+数据库,license_record,fee_cny,"NUMERIC(12,2)",—,授权费，CHECK >= 0
+数据库,license_record,contract_hash,CHAR(64),—,合同文件 SHA-256，防篡改
+数据库,license_record,status,VARCHAR(16),—,active / expired / revoked
+数据库,license_record,prev_license_id,BIGINT,—,自引用，指向上一次授权，串成流转链
+数据库,license_record,created_at,TIMESTAMPTZ,—,登记时间
+数据库,asset_genealogy,genealogy_id,BIGSERIAL,—,主键
+数据库,asset_genealogy,parent_asset_id,BIGINT,—,外键 → asset，父作品
+数据库,asset_genealogy,child_asset_id,BIGINT,—,外键 → asset，子作品
+数据库,asset_genealogy,relation_type,VARCHAR(32),—,adapted 改编 / restored 修复 / collaborated 合作
+数据库,asset_genealogy,similarity,"NUMERIC(5,4)",—,父子视觉相似度快照
+数据库,asset_genealogy,note,TEXT,—,说明
+数据库,asset_genealogy,created_by,BIGINT,—,登记人；用户被删时置空而非级联删除
+数据库,asset_genealogy,created_at,TIMESTAMPTZ,—,登记时间
+数据库,system_audit_log,log_id,BIGSERIAL,—,主键
+数据库,system_audit_log,table_name,VARCHAR(64),—,被改动的事实表名
+数据库,system_audit_log,record_id,BIGINT,—,被改动的行主键
+数据库,system_audit_log,operation,VARCHAR(16),—,INSERT / UPDATE / DELETE
+数据库,system_audit_log,actor,VARCHAR(64),—,执行变更的数据库会话用户，默认 current_user
+数据库,system_audit_log,old_snapshot,JSONB,—,变更前整行快照，JSONB
+数据库,system_audit_log,new_snapshot,JSONB,—,变更后整行快照，JSONB
+数据库,system_audit_log,changed_fields,TEXT[],—,仅发生变化的列名数组，便于检索
+数据库,system_audit_log,logged_at,TIMESTAMPTZ,—,记录时间

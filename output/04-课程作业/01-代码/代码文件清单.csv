@@ -1,0 +1,38 @@
+﻿文件,行数,字节,分组,职责
+bootstrap.py,265,10620,入口与依赖,一键启动：依赖 → 数据库 → AI 后端 → 服务，四段自检后决定跑真库还是演示模式
+docker-compose.yml,53,2183,入口与依赖,pgvector/pgvector:pg16 容器，扩展预装，省掉自己编译
+requirements-deep.txt,22,922,入口与依赖,可选深度后端（torch / open_clip），约 2~3 GB
+requirements.txt,44,1641,入口与依赖,核心依赖（不含 torch），pip 装完约几十秒
+run.py,115,4389,入口与依赖,uvicorn 启动包装，修 Windows 下 reload 丢失工作目录导致导入失败的问题
+scripts/check_seed.py,172,7314,工程脚本,种子自校验：用真实算法回算 AI 结论，防止手编数字
+scripts/init_db.py,249,8814,工程脚本,Docker 一键建库：起容器 → 等 healthy → 按序执行 3 个 SQL → 回填向量
+scripts/init_seed.py,301,16447,工程脚本,把 seed_demo.json 灌进真库（演示模式与真库共用同一份源）
+scripts/make_seed_images.py,254,10303,工程脚本,生成 8 张作品图（像素级互不相同，规避 file_hash 去重）
+app/__init__.py,2,98,应用代码,包声明与版本号
+app/ai/__init__.py,1,31,应用代码,AI 子包声明
+app/ai/classifier.py,176,7619,应用代码,分级建议器：相似度 → 建议级别 + 置信度，绝不写 right_level
+app/ai/features.py,503,24015,应用代码,特征提取三档后端（builtin / clip / resnet），统一 512 维 L2 归一化
+app/ai/similarity.py,216,8311,应用代码,向量检索：cosine 距离 <=>、HNSW、ef_search、强制走索引
+app/api.py,471,20448,应用代码,路由层：18 个端点，只做参数编解码与鉴权，不写业务 SQL
+app/auth.py,163,5831,应用代码,鉴权：JWT(HS256) 签发校验（纯标准库）+ 应用层 RBAC 依赖注入
+app/cli.py,410,17675,应用代码,运维 CLI：check / backfill-motif-vectors / demo-check / demo-seed
+app/config.py,82,3537,应用代码,全局配置：环境变量 > .env > 默认值三级覆盖，集中在类 Settings 里
+app/db.py,167,6367,应用代码,数据访问层：连接池、事务上下文、连接级 SET LOCAL ROLE 让 GRANT 生效
+app/demo.py,1129,54148,应用代码,演示模式：内存存储，实现与 services 同名同签名的函数，api 无需改动
+app/main.py,216,8322,应用代码,应用入口：lifespan 启停、静态页挂载、把数据库异常映射成 HTTP 状态码
+app/motif_images.py,330,15406,应用代码,程序生成 3 张母题参考图与 2 张样例图（无版权风险）
+app/schemas.py,257,7605,应用代码,18 组 Pydantic 模型，把非法入参挡在业务层之外
+app/services.py,790,34262,应用代码,业务层：一次业务操作 = 一个事务；终审四步在此原子完成
+sql/00_compat_vector.sql,149,6670,数据库脚本,降级层：无 pgvector 时用 NUMERIC[] + 自定义 <=> 运算符顶上
+sql/01_init.sql,313,19117,数据库脚本,8 张表 + 3 个枚举 + 主外键 / CHECK / UNIQUE / 注释
+sql/02_index_trigger_view.sql,663,33184,数据库脚本,14 个索引（含 2 个 HNSW）+ 7 个触发器 + 3 个只读视图
+sql/03_seed.sql,65,3401,数据库脚本,最小可运行种子：3 账号 / 3 母题，建库即可跑
+tests/check_demo_page.py,335,16466,测试,纯界面演示页验收：file:// 直开、断网零请求、重置
+tests/check_demo_v2.py,389,18043,测试,互动版演示页验收：拖动登录、终审、阈值联动
+tests/run_e2e_inline.py,68,1853,测试,进程内端到端：18 个端点全链路，含 403 / 409 反向验证
+tests/shoot_ui.py,193,8578,测试,真实浏览器 UI 断言：四角色 × 五页签，数值级比对
+tests/test_classifier.py,110,4772,测试,分级器三档阈值边界、多母题规则、抄袭例外
+tests/test_compat_vector.py,215,9257,测试,无 pgvector 时的降级向量层与 numpy 结果对齐
+tests/test_feature_engine.py,214,9328,测试,特征后端：512 维、L2 归一化、同图确定性、异图差异
+tests/test_invariants.py,500,27534,测试,源码不变量：AI 不写权属、路由不写 SQL、事务边界、分层依赖
+tests/test_sql_structure.py,349,13583,测试,SQL 静态结构校验 18 项：表 / 视图 / 触发器 / 索引 / 列级授权语句

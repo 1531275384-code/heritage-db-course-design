@@ -1,0 +1,409 @@
+<!-- =========================================================
+     应用主界面
+     ========================================================= -->
+<div id="app">
+
+  <header>
+    <div class="brand">
+      <div class="seal">遗</div>
+      <div>
+        <div class="t1">非遗数字资产分级确权与溯源</div>
+        <div class="t2">ICH DIGITAL ASSET LEDGER</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="crumb" id="crumb">工作台</div>
+    <div class="spacer"></div>
+
+    <button class="hbtn" id="btnBell" title="待办通知">◔</button>
+    <button class="hbtn" id="btnHelp" title="演示说明">?</button>
+
+    <div class="me" id="meBox">
+      <div class="av" id="meAv">杨</div>
+      <div>
+        <div class="nm" id="meNm">杨秀英</div>
+        <div class="og" id="meOg">传习所</div>
+      </div>
+      <div class="menu" id="meMenu">
+        <button class="mi" data-act="profile"><span class="ic">◯</span>账号信息</button>
+        <button class="mi" data-act="settings"><span class="ic">◍</span>演示设置</button>
+        <div class="sep"></div>
+        <button class="mi danger" data-act="logout"><span class="ic">⏻</span>退出登录</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="body">
+
+    <nav id="nav">
+      <div class="sec">工作区</div>
+      <button data-pg="dashboard"><span class="ic">▤</span><span class="tx">概览</span></button>
+      <button data-pg="assets"><span class="ic">▦</span><span class="tx">作品管理</span><span class="bdg" id="bdgAssets"></span></button>
+      <button data-pg="motifs"><span class="ic">◈</span><span class="tx">母题库</span></button>
+      <button data-pg="upload"><span class="ic">↑</span><span class="tx">上传与 AI 分析</span></button>
+
+      <div class="sec">审核与监管</div>
+      <button data-pg="review"><span class="ic">✓</span><span class="tx">专家工作台</span><span class="bdg" id="bdgReview"></span></button>
+      <button data-pg="ledger"><span class="ic">▩</span><span class="tx">监管台账</span></button>
+      <button data-pg="trace"><span class="ic">⑃</span><span class="tx">溯源图谱</span></button>
+      <button data-pg="audit"><span class="ic">☰</span><span class="tx">审计日志</span></button>
+
+      <div class="sec">系统</div>
+      <button data-pg="settings"><span class="ic">⚙</span><span class="tx">演示设置</span></button>
+
+      <div class="foot">
+        <div class="note">
+          <b>演示模式</b>
+          数据在浏览器内存中，刷新即恢复种子状态。
+        </div>
+      </div>
+    </nav>
+
+    <main>
+
+      <!-- ==================== 概览 ==================== -->
+      <div class="page" id="pg-dashboard">
+        <div class="ph">
+          <div>
+            <h2>概览</h2>
+            <div class="sub" id="dashSub">当前身份可见范围内的资产与流转情况</div>
+          </div>
+          <div class="right">
+            <div class="seg" id="dashRange">
+              <button data-v="week">近 7 天</button>
+              <button data-v="month">近 30 天</button>
+              <button data-v="all">全部</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats" id="dashStats"></div>
+
+        <div style="display:grid;grid-template-columns:1.15fr .85fr;gap:14px" id="dashRow">
+          <div class="card">
+            <div class="card-h"><h3>分级分布</h3><span class="sub">括号内为占比</span></div>
+            <div class="card-b" id="dashDist"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>最近动态</h3></div>
+            <div class="card-b" id="dashFeed"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="card-h"><h3>待办提醒</h3><span class="sub">按角色聚合</span></div>
+          <div class="card-b" id="dashTodo"></div>
+        </div>
+      </div>
+
+      <!-- ==================== 作品管理 ==================== -->
+      <div class="page" id="pg-assets">
+        <div class="ph">
+          <div>
+            <h2>作品管理</h2>
+            <div class="sub" id="assetsSub">—</div>
+          </div>
+          <div class="right">
+            <button class="btn sm" id="btnExportAll">导出清单</button>
+            <button class="btn primary sm" id="btnGoUpload">＋ 上传作品</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-b" style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--line2);padding:12px 14px">
+            <input class="inp" id="aQ" placeholder="搜索标题 / 编号…" style="width:186px">
+            <div class="seg" id="aLv">
+              <button data-v="all">全部</button>
+              <button data-v="original">原创</button>
+              <button data-v="derived">改编</button>
+              <button data-v="public">公有</button>
+              <button data-v="undecided">未定</button>
+            </div>
+            <select class="sel" id="aSt">
+              <option value="all">全部状态</option>
+              <option value="approved">已确权</option>
+              <option value="pending">待审</option>
+              <option value="draft">草稿</option>
+            </select>
+            <select class="sel" id="aSort">
+              <option value="id">按编号</option>
+              <option value="date">按创建时间</option>
+              <option value="name">按名称</option>
+              <option value="lic">按授权笔数</option>
+            </select>
+            <div class="seg" id="aView">
+              <button data-v="table">表格</button>
+              <button data-v="card">卡片</button>
+            </div>
+          </div>
+
+          <!-- 批量操作条 -->
+          <div id="aBulk" style="display:none;padding:9px 14px;background:var(--ind-l);border-bottom:1px solid #d5e3ee;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:12px;font-weight:700;color:var(--ind)" id="aBulkCnt">已选 0 项</span>
+            <button class="btn sm" data-bulk="export">批量导出</button>
+            <button class="btn sm" data-bulk="trace">查看溯源</button>
+            <button class="btn sm" data-bulk="clear">取消选择</button>
+          </div>
+
+          <div id="aList"></div>
+        </div>
+      </div>
+
+      <!-- ==================== 母题库 ==================== -->
+      <div class="page" id="pg-motifs">
+        <div class="ph">
+          <div>
+            <h2>母题库</h2>
+            <div class="sub">公有领域传统纹样，任何个人不得独占；本库是所有相似比对的基准</div>
+          </div>
+          <div class="right">
+            <input class="inp" id="mQ" placeholder="搜索名称 / 关键词…" style="width:186px">
+            <select class="sel" id="mCat">
+              <option value="all">全部类别</option>
+            </select>
+            <select class="sel" id="mEra">
+              <option value="all">全部年代</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-b" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 14px">
+            <span style="font-size:11.5px;font-weight:700;color:var(--ink3);letter-spacing:.5px">按民族筛选</span>
+            <div class="chips" id="mEthnic"></div>
+            <span style="margin-left:auto;font-size:11.5px;color:var(--ink3)" id="mCount"></span>
+          </div>
+        </div>
+
+        <div class="mgrid" id="mList"></div>
+      </div>
+
+      <!-- ==================== 上传与 AI 分析 ==================== -->
+      <div class="page" id="pg-upload">
+        <div class="ph">
+          <div>
+            <h2>上传与 AI 分析</h2>
+            <div class="sub">AI 只输出档位建议与置信度，<b>不会写入权属字段</b></div>
+          </div>
+        </div>
+
+        <div class="up-grid">
+          <!-- 左：选择 -->
+          <div class="card">
+            <div class="card-h"><h3>1. 选择待分析作品</h3></div>
+            <div class="card-b">
+              <div class="dropzone" id="dropzone">
+                <div class="ic">↑</div>
+                <div class="t1">点击选择本地文件</div>
+                <div class="t2">演示环境不读取真实文件，请在下方样例中选择</div>
+              </div>
+
+              <div style="font-size:11.5px;font-weight:700;color:var(--ink3);letter-spacing:.5px;margin:14px 0 8px">
+                可用样例（点击选中）
+              </div>
+              <div class="samples" id="upSamples"></div>
+
+              <div style="font-size:11.5px;font-weight:700;color:var(--ink3);letter-spacing:.5px;margin:16px 0 8px">
+                比对基准母题（可指定，也可由系统自动检索）
+              </div>
+              <select class="sel" id="upMotif" style="width:100%">
+                <option value="auto">自动检索最相似母题</option>
+              </select>
+
+              <div style="display:flex;gap:9px;margin-top:16px">
+                <button class="btn primary" id="btnAnalyze" style="flex:1" disabled>开始分析</button>
+                <button class="btn" id="btnClearUp">清空</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右：结果 -->
+          <div class="card" id="upResultCard">
+            <div class="card-h">
+              <h3>2. 分析结果</h3>
+              <span class="sub" id="upResultTag"></span>
+            </div>
+            <div class="card-b" id="upResult">
+              <div class="empty"><div class="ic">◌</div>尚未分析，请先在左侧选择一张样例</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 专家工作台 ==================== -->
+      <div class="page" id="pg-review">
+        <div class="ph">
+          <div>
+            <h2>专家工作台</h2>
+            <div class="sub">终审写入权属；结论与 AI 不一致时会标记为「推翻」</div>
+          </div>
+          <div class="right" id="reviewActions"></div>
+        </div>
+
+        <div class="rv">
+          <div class="card">
+            <div class="card-h"><h3>待审队列</h3><span class="sub" id="rvCount"></span></div>
+            <div class="card-b" style="padding:11px">
+              <div class="rv-list" id="rvList"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>终审</h3><span class="sub" id="rvTitle">未选择作品</span></div>
+            <div class="card-b" id="rvBody">
+              <div class="empty"><div class="ic">◌</div>请从左侧待审队列中选择一件作品</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 监管台账 ==================== -->
+      <div class="page" id="pg-ledger">
+        <div class="ph">
+          <div>
+            <h2>监管台账</h2>
+            <div class="sub">全部授权记录，含类型、范围、地域、期限与金额</div>
+          </div>
+          <div class="right">
+            <select class="sel" id="lType">
+              <option value="all">全部授权类型</option>
+              <option value="exclusive">独占授权</option>
+              <option value="non_exclusive">非独占授权</option>
+            </select>
+            <select class="sel" id="lSort">
+              <option value="fee">按金额降序</option>
+              <option value="date">按起始日</option>
+              <option value="asset">按作品编号</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="stats" id="ledgerStats"></div>
+
+        <div class="card">
+          <div class="card-b" style="padding:12px 14px;border-bottom:1px solid var(--line2);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div class="seg" id="lScope">
+              <button data-v="all">全部</button>
+              <button data-v="active">生效中</button>
+              <button data-v="expired">已到期</button>
+            </div>
+            <span style="font-size:11.5px;color:var(--ink3)" id="lCount"></span>
+          </div>
+          <div class="tw" id="lList"></div>
+        </div>
+      </div>
+
+      <!-- ==================== 溯源图谱 ==================== -->
+      <div class="page" id="pg-trace">
+        <div class="ph">
+          <div>
+            <h2>溯源图谱</h2>
+            <div class="sub">母题 → 作品 → 授权 → 被授权方，四级链路逐段可查</div>
+          </div>
+          <div class="right">
+            <select class="sel" id="tPick" style="min-width:220px"></select>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>链路图</h3><span class="sub" id="tSub"></span></div>
+          <div class="card-b">
+            <div class="trace-wrap" id="tGraph"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <div class="card-h"><h3>节点明细</h3></div>
+          <div class="card-b" id="tNodes"></div>
+        </div>
+      </div>
+
+      <!-- ==================== 审计日志 ==================== -->
+      <div class="page" id="pg-audit">
+        <div class="ph">
+          <div>
+            <h2>审计日志</h2>
+            <div class="sub">只追加，不修改；每条记录含操作者、动作、对象与时间</div>
+          </div>
+          <div class="right">
+            <div class="chips" id="auType"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-b" id="auList"></div>
+        </div>
+      </div>
+
+      <!-- ==================== 演示设置 ==================== -->
+      <div class="page" id="pg-settings">
+        <div class="ph">
+          <div>
+            <h2>演示设置</h2>
+            <div class="sub">改动只作用于当前浏览器会话</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px" id="setRow">
+          <div class="card">
+            <div class="card-h"><h3>显示</h3></div>
+            <div class="card-b" style="display:flex;flex-direction:column;gap:14px">
+              <label class="switch" data-cfg="compact"><span class="track"></span><span class="lb">紧凑表格行高</span></label>
+              <label class="switch" data-cfg="showConf"><span class="track"></span><span class="lb">显示 AI 置信度数值</span></label>
+              <label class="switch" data-cfg="anim"><span class="track"></span><span class="lb">启用过渡动画</span></label>
+              <label class="switch" data-cfg="showHint"><span class="track"></span><span class="lb">显示字段说明提示</span></label>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h3>分级阈值</h3><span class="sub">拖动查看判定区间如何变化</span></div>
+            <div class="card-b">
+              <div style="font-size:12px;color:var(--ink2);margin-bottom:7px">原创 / 改编 分界（相似度低于此值判原创）</div>
+              <div class="rng"><input type="range" id="thrD" min="50" max="95" value="80"><span class="val" id="thrDv">0.80</span></div>
+
+              <div style="font-size:12px;color:var(--ink2);margin:16px 0 7px">改编 / 公有 分界（高于此值判公有母题）</div>
+              <div class="rng"><input type="range" id="thrO" min="70" max="99" value="92"><span class="val" id="thrOv">0.92</span></div>
+
+              <div class="note-box" id="thrNote" style="margin-top:16px"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="card-h"><h3>数据与重置</h3></div>
+          <div class="card-b" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+            <div>
+              <div style="font-size:11.5px;color:var(--ink3);font-weight:700;margin-bottom:6px">默认打开页面</div>
+              <select class="sel" id="defPage">
+                <option value="dashboard">概览</option>
+                <option value="assets">作品管理</option>
+                <option value="motifs">母题库</option>
+                <option value="ledger">监管台账</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:var(--ink3);font-weight:700;margin-bottom:6px">表格每页条数</div>
+              <select class="sel" id="pageSize">
+                <option value="10">10 条</option>
+                <option value="20">20 条</option>
+                <option value="50">50 条</option>
+              </select>
+            </div>
+            <button class="btn" id="btnResetAll" style="margin-left:auto">恢复演示数据</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ==================== 详情抽屉 ==================== -->
+<div class="drawer-mask" id="dMask"></div>
+<div class="drawer" id="drawer">
+  <div class="dh">
+    <h3 id="dTitle">作品详情</h3>
+    <button class="x" id="dClose">✕</button>
+  </div>
+  <div class="db" id="dBody"></div>
+  <div class="df" id="dFoot"></div>
+</div>
+
+<div class="toast" id="toast"></div>

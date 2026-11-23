@@ -1,0 +1,296 @@
+{
+  "backend": {
+    "backend": "builtin-hog-color-texture",
+    "version": "1.0.0",
+    "dim": 512,
+    "is_deep_model": false
+  },
+  "motifs": 3,
+  "assets": {
+    "1": {
+      "title": "蝴蝶纹袖片（杨氏改良版）",
+      "file": "sample_derived_butterfly.jpg",
+      "suggested": "derived",
+      "confidence": 0.4372,
+      "top_k": [
+        {
+          "kind": "public_motif",
+          "id": 1,
+          "code": "MO-001",
+          "name": "蝴蝶纹",
+          "similarity": 0.918176464065352,
+          "distance": 0.08182353593464797,
+          "extra": {
+            "region": "贵州黔东南"
+          }
+        },
+        {
+          "kind": "public_motif",
+          "id": 3,
+          "code": "MO-003",
+          "name": "回纹",
+          "similarity": 0.42554589218887384,
+          "distance": 0.5744541078111262,
+          "extra": {
+            "region": "河南洛阳"
+          }
+        },
+        {
+          "kind": "public_motif",
+          "id": 2,
+          "code": "MO-002",
+          "name": "缠枝莲纹",
+          "similarity": 0.37434316050524685,
+          "distance": 0.6256568394947531,
+          "extra": {
+            "region": "江苏苏州"
+          }
+        }
+      ],
+      "final": "derived",
+      "license": {
+        "license_id": 2,
+        "asset_id": 1,
+        "licensor_id": 1,
+        "licensor_name": "杨秀英",
+        "licensee_user_id": null,
+        "licensee_name": "省博物馆文创开发部",
+        "license_type": "exclusive",
+        "scope": "文创衍生品开发与销售",
+        "territory": "中国大陆",
+        "start_date": "2026-11-01",
+        "end_date": "2029-10-31",
+        "fee_cny": "18000",
+        "status": "active",
+        "contract_hash": null,
+        "prev_license_id": null,
+        "created_at": "2026-10-26T08:02:19.293014Z"
+      }
+    },
+    "2": {
+      "title": "鱼纹挑花（原创）",
+      "file": "sample_original_fish.jpg",
+      "suggested": "original",
+      "confidence": 0.7417,
+      "top_k": [
+        {
+          "kind": "public_motif",
+          "id": 2,
+          "code": "MO-002",
+          "name": "缠枝莲纹",
+          "similarity": 0.6035855478691743,
+          "distance": 0.3964144521308257,
+          "extra": {
+            "region": "江苏苏州"
+          }
+        },
+        {
+          "kind": "public_motif",
+          "id": 3,
+          "code": "MO-003",
+          "name": "回纹",
+          "similarity": 0.30325926939885295,
+          "distance": 0.696740730601147,
+          "extra": {
+            "region": "河南洛阳"
+          }
+        },
+        {
+          "kind": "public_motif",
+          "id": 1,
+          "code": "MO-001",
+          "name": "蝴蝶纹",
+          "similarity": 0.26577188597084056,
+          "distance": 0.7342281140291594,
+          "extra": {
+            "region": "贵州黔东南"
+          }
+        }
+      ],
+      "final": "original",
+      "license": {
+        "license_id": 1,
+        "asset_id": 2,
+        "licensor_id": 1,
+        "licensor_name": "杨秀英",
+        "licensee_user_id": null,
+        "licensee_name": "省博物馆文创开发部",
+        "license_type": "exclusive",
+        "scope": "文创衍生品开发与销售",
+        "territory": "中国大陆",
+        "start_date": "2026-11-01",
+        "end_date": "2029-10-31",
+        "fee_cny": "18000",
+        "status": "active",
+        "contract_hash": null,
+        "prev_license_id": null,
+        "created_at": "2026-10-26T08:02:19.289149Z"
+      }
+    }
+  },
+  "notes": [
+    {
+      "level": "设计内",
+      "what": "AI 后端降级到 builtin",
+      "detail": "未安装 torch，自动降级为 HOG+HSV+Laplacian 手工特征。维度仍为 512，无需 GPU，属设计内方案。"
+    }
+  ],
+  "calls": [
+    {
+      "m": "GET",
+      "p": "/api/health",
+      "st": 200,
+      "ms": 90.42024612426758
+    },
+    {
+      "m": "GET",
+      "p": "/api/motifs",
+      "st": 401,
+      "ms": 21.964550018310547
+    },
+    {
+      "m": "POST",
+      "p": "/api/auth/login",
+      "st": 200,
+      "ms": 36.2095832824707
+    },
+    {
+      "m": "POST",
+      "p": "/api/auth/login",
+      "st": 200,
+      "ms": 7.368803024291992
+    },
+    {
+      "m": "POST",
+      "p": "/api/auth/login",
+      "st": 200,
+      "ms": 17.270565032958984
+    },
+    {
+      "m": "GET",
+      "p": "/api/motifs",
+      "st": 200,
+      "ms": 3.8771629333496094
+    },
+    {
+      "m": "POST",
+      "p": "/api/asset/upload",
+      "st": 201,
+      "ms": 64.97621536254883
+    },
+    {
+      "m": "POST",
+      "p": "/api/asset/1/analyze",
+      "st": 200,
+      "ms": 61.38491630554199
+    },
+    {
+      "m": "GET",
+      "p": "/api/asset/1",
+      "st": 200,
+      "ms": 21.46744728088379
+    },
+    {
+      "m": "GET",
+      "p": "/api/asset/1",
+      "st": 200,
+      "ms": 3.6535263061523438
+    },
+    {
+      "m": "POST",
+      "p": "/api/asset/upload",
+      "st": 201,
+      "ms": 6.888866424560547
+    },
+    {
+      "m": "POST",
+      "p": "/api/asset/2/analyze",
+      "st": 200,
+      "ms": 31.869173049926758
+    },
+    {
+      "m": "GET",
+      "p": "/api/asset/2",
+      "st": 200,
+      "ms": 3.122568130493164
+    },
+    {
+      "m": "GET",
+      "p": "/api/asset/2",
+      "st": 200,
+      "ms": 31.00275993347168
+    },
+    {
+      "m": "GET",
+      "p": "/api/audit/pending",
+      "st": 200,
+      "ms": 6.946325302124023
+    },
+    {
+      "m": "GET",
+      "p": "/api/audit/pending",
+      "st": 403,
+      "ms": 22.114992141723633
+    },
+    {
+      "m": "POST",
+      "p": "/api/audit/2/approve",
+      "st": 200,
+      "ms": 4.297733306884766
+    },
+    {
+      "m": "POST",
+      "p": "/api/audit/1/approve",
+      "st": 200,
+      "ms": 27.659177780151367
+    },
+    {
+      "m": "POST",
+      "p": "/api/audit/2/approve",
+      "st": 409,
+      "ms": 3.173828125
+    },
+    {
+      "m": "GET",
+      "p": "/api/asset/mine",
+      "st": 200,
+      "ms": 27.395009994506836
+    },
+    {
+      "m": "POST",
+      "p": "/api/asset/2/license",
+      "st": 201,
+      "ms": 4.304170608520508
+    },
+    {
+      "m": "POST",
+      "p": "/api/asset/1/license",
+      "st": 201,
+      "ms": 3.8068294525146484
+    },
+    {
+      "m": "POST",
+      "p": "/api/asset/2/license",
+      "st": 409,
+      "ms": 27.588844299316406
+    },
+    {
+      "m": "GET",
+      "p": "/api/asset/2/trace",
+      "st": 200,
+      "ms": 13.735771179199219
+    },
+    {
+      "m": "GET",
+      "p": "/api/asset/1/trace",
+      "st": 200,
+      "ms": 14.041423797607422
+    },
+    {
+      "m": "GET",
+      "p": "/api/ledger",
+      "st": 200,
+      "ms": 13.253927230834961
+    }
+  ]
+}

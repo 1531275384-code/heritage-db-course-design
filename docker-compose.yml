@@ -1,0 +1,53 @@
+# =============================================================================
+#  非遗数字资产确权系统 —— 本地开发环境
+#
+#  为什么用 pgvector/pgvector 镜像而不是官方 postgres 镜像：
+#    官方镜像不含 pgvector 扩展，装它要么编译（Windows 无编译器时彻底卡死），
+#    要么手工拷 DLL。pgvector 官方维护的镜像已经把扩展预装好，省掉所有折腾。
+#
+#  用法：
+#      docker compose up -d          # 启动
+#      docker compose logs -f db     # 看数据库日志
+#      docker compose down           # 停止（保留数据）
+#      docker compose down -v        # 停止并删除数据（重置）
+#
+#  首次启动后仍需执行建表脚本（容器只负责"有一个空的库"）：
+#      psql -h 127.0.0.1 -p 5432 -U postgres -d ich_heritage -f sql/01_init.sql
+#      psql -h 127.0.0.1 -p 5432 -U postgres -d ich_heritage -f sql/02_index_trigger_view.sql
+#      psql -h 127.0.0.1 -p 5432 -U postgres -d ich_heritage -f sql/03_seed.sql
+#  或者直接跑：python bootstrap.py（它会检查表是否建好并提示）
+# =============================================================================
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: ich-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ich_heritage
+      # 中文排序/编码：确保 btrim、length 等字符串函数按字符而非字节工作
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ich_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # 用 pg_isready 而不是 psql：镜像里 psql 存在但不必依赖认证配置
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ich_heritage"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    command:
+      # 默认连接数 100 足够；把慢查询阈值降到 200ms，方便观察 HNSW 是否被用上
+      - "postgres"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "log_min_duration_statement=200"
+
+volumes:
+  ich_pgdata:
+    name: ich_pgdata
