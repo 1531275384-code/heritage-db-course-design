@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数据看板 · 地方非遗文化数字化保护数据库管理系统</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <div class="main">
+        <header class="topbar">
+            <div>
+                <h1>数据看板</h1>
+                <div class="crumb">首页 / 非遗数字化保护全局概览</div>
+            </div>
+            <div class="topbar-actions">
+                <span class="badge" id="topbar-conn">● 检测中</span>
+                <span class="badge teal" id="topbar-db">数据库 heritage_db</span>
+            </div>
+        </header>
+
+        <main class="content">
+
+            <!-- ================= KPI ================= -->
+            <section class="section">
+                <h2 class="section-title">核心指标<small>数据来源：11 张业务表实时统计</small></h2>
+                <div class="grid g6" id="kpi-row"></div>
+            </section>
+
+            <!-- ================= 数字化成效 ================= -->
+            <section class="section">
+                <h2 class="section-title">文化数字化保护成效<small>对应"国家文化数字化战略"落地指标</small></h2>
+                <div class="grid g3">
+                    <div class="card">
+                        <div class="card-head"><h3>项目数字化建档率</h3><span class="hint">is_digitized = 1 占比</span></div>
+                        <div class="card-body" id="rate-project"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-head"><h3>作品数字化采集覆盖率</h3><span class="hint">digitize_status ≠ '未数字化'</span></div>
+                        <div class="card-body" id="rate-work"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-head"><h3>作品数字化入库率</h3><span class="hint">digitize_status = '已入库'</span></div>
+                        <div class="card-body" id="rate-store"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= 分布图表 ================= -->
+            <section class="section">
+                <div class="grid g3">
+                    <div class="card">
+                        <div class="card-head"><h3>项目级别分布</h3><span class="hint">国家级 / 省级 / 市级 / 县级</span></div>
+                        <div class="card-body" id="chart-level"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-head"><h3>一级门类项目分布</h3><span class="hint">二级门类已上卷归并</span></div>
+                        <div class="card-body" id="chart-category"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-head"><h3>研学活动月度开展趋势</h3><span class="hint">按活动开始时间聚合</span></div>
+                        <div class="card-body" id="chart-trend"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= 热度排行 ================= -->
+            <section class="section">
+                <div class="grid g2">
+                    <div class="card">
+                        <div class="card-head">
+                            <h3>非遗活态传承热度指数排行</h3>
+                            <span class="hint">算法模型 · 详见右侧公式</span>
+                        </div>
+                        <div class="card-body"><div id="chart-heat"></div></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-head"><h3>热度评估模型（HVI）</h3><span class="hint">数据库视图 + 服务层算法双实现</span></div>
+                        <div class="card-body">
+                            <pre class="code" id="heat-formula"></pre>
+                            <div class="note mt14" id="heat-note"></div>
+                            <div class="mt14">
+                                <div class="between mb0" style="margin-bottom:6px">
+                                    <b style="font-size:13px">热度分项构成（TOP 3 项目）</b>
+                                    <span class="muted" style="font-size:12px">作品 / 数字化 / 活动 / 报名 / 级别 / 濒危</span>
+                                </div>
+                                <div id="heat-detail"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= 预警 ================= -->
+            <section class="section">
+                <div class="grid g2">
+                    <div class="card">
+                        <div class="card-head"><h3>濒危项目预警</h3><span class="hint">project_status = '濒危'，需优先抢救性保护</span></div>
+                        <div class="card-body tight" id="tbl-endangered"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-head"><h3>传承人代际风险预警</h3><span class="hint">高龄 / 健康状况不佳的传承人名单</span></div>
+                        <div class="card-body tight" id="tbl-risk"></div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+</div>
+
+<div id="toast-host"></div>
+
+<script src="assets/js/snapshot.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+    HUI.renderSidebar('index.html');
+
+    var S = { overview: null, heat: [], inheritors: [] };
+
+    function kpiCards(k) {
+        var digitRate = k.project_total ? (k.project_digitized / k.project_total * 100) : 0;
+        var items = [
+            { label: '在册非遗项目', value: k.project_total, unit: '项', foot: '其中濒危项目 ' + k.endangered_total + ' 项', tint: '#f7eae7' },
+            { label: '代表性传承人', value: k.inheritor_total, unit: '人', foot: '已故 ' + k.inheritor_deceased + ' 人，代际传承紧迫', tint: '#e5eff0' },
+            { label: '非遗作品/数字藏品', value: k.work_total, unit: '件', foot: '已数字化 ' + k.work_collected + ' 件', tint: '#f8f0e1' },
+            { label: '研学课程', value: k.course_total, unit: '门', foot: '累计开办活动 ' + k.activity_total + ' 场', tint: '#eeebf6' },
+            { label: '开放报名活动', value: k.activity_open, unit: '场', foot: '注册学生 ' + k.student_total + ' 人', tint: '#e7f2ec' },
+            { label: '累计有效报名', value: k.registration_total, unit: '人次', foot: '数字化建档率 ' + digitRate.toFixed(1) + '%', tint: '#f7eae7' }
+        ];
+        document.getElementById('kpi-row').innerHTML = items.map(function (i) {
+            return '<div class="card kpi" style="--tint:' + i.tint + '">' +
+                     '<div class="k-label">' + i.label + '</div>' +
+                     '<div class="k-value">' + i.value + '<em>' + i.unit + '</em></div>' +
+                     '<div class="k-foot">' + i.foot + '</div>' +
+                   '</div>';
+        }).join('');
+    }
+
+    function rateBlock(host, label, num, den, color) {
+        var pct = den ? num / den * 100 : 0;
+        host.innerHTML =
+            '<div class="between" style="align-items:baseline">' +
+              '<div class="k-value" style="font-size:28px;margin:0">' + pct.toFixed(1) + '<em>%</em></div>' +
+              '<div class="muted" style="font-size:12px">' + num + ' / ' + den + '</div>' +
+            '</div>' +
+            '<div class="bar ' + (color || '') + ' mt8" style="height:9px"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
+            '<div class="muted" style="font-size:12px;margin-top:8px">' + label + '</div>';
+    }
+
+    function renderHeatDetail(top3) {
+        document.getElementById('heat-detail').innerHTML = top3.map(function (p) {
+            var d = p.heat_detail;
+            var parts = [
+                ['作品', d.work_part, '#a4342a'], ['数字化', d.digitized_part, '#1f5a63'],
+                ['活动', d.activity_part, '#b0813a'], ['报名', d.enroll_part, '#2f7a55'],
+                ['级别', d.level_part, '#5b4b8a'], ['濒危', d.endangered_part, '#c9533f']
+            ];
+            var total = Math.max(p.heat_score, 1);
+            var segs = parts.map(function (x, i) {
+                return '<rect x="0" y="' + (i * 13) + '" width="' + (x[1] / total * 100) +
+                       '%" height="10" rx="4" fill="' + x[2] + '"/>';
+            }).join('');
+            return '<div class="mt8"><div class="between" style="margin-bottom:4px">' +
+                     '<b style="font-size:12.5px">' + p.project_name + '</b>' +
+                     '<span class="score-pill">' + p.heat_score.toFixed(1) + '<small>分</small></span>' +
+                   '</div>' +
+                   '<svg class="chart" viewBox="0 0 100 78" preserveAspectRatio="none" style="height:78px">' +
+                     segs + '</svg></div>';
+        }).join('');
+    }
+
+    Promise.all([
+        HDATA.get('/api/overview'),
+        HDATA.get('/api/projects/heat', { top: 12 }),
+        HDATA.get('/api/inheritors', { size: 200 })
+    ]).then(function (res) {
+        var ov = res[0] || { kpi: {}, level_distribution: [], category_distribution: [], activity_trend: [] };
+        S.overview = ov; S.heat = res[1] || []; S.inheritors = res[2] || [];
+
+        HUI.setConnState(HDATA.online, HDATA.message);
+        var k = ov.kpi || {};
+
+        kpiCards(k, S.inheritors);
+        rateBlock(document.getElementById('rate-project'), '已建立数字化档案的项目数占全部在册项目比重', k.project_digitized || 0, k.project_total || 0, 'red');
+        rateBlock(document.getElementById('rate-work'), '已完成采集/建模/入库的作品占全部作品比重', k.work_collected || 0, k.work_total || 0, '');
+        rateBlock(document.getElementById('rate-store'), '已正式入库（可长期保存）的作品占比', k.work_stored || 0, k.work_total || 0, 'gold');
+
+        HUI.donut(document.getElementById('chart-level'),
+            (ov.level_distribution || []).map(function (d) { return { label: d.level, value: d.cnt }; }),
+            { centerText: '项目' });
+
+        HUI.hbars(document.getElementById('chart-category'),
+            (ov.category_distribution || []).map(function (d) { return { label: d.category, value: d.project_count }; }),
+            { labelWidth: 96, rowHeight: 30 });
+
+        HUI.columns(document.getElementById('chart-trend'),
+            (ov.activity_trend || []).map(function (d) { return { label: d.month.slice(2), value: d.activity_count }; }),
+            { color: '#1f5a63', height: 216 });
+
+        HUI.heatBars(document.getElementById('chart-heat'),
+            S.heat.slice(0, 12).map(function (p) { return { name: p.project_name, score: p.heat_score, grade: p.heat_grade }; }));
+
+        document.getElementById('heat-formula').textContent =
+            'HVI(p) = W×2.0 + D×3.0 + A×4.0 + E×1.5 + L(级别) + B(濒危)\n\n' +
+            '  W  已归档作品数\n' +
+            '  D  已数字化入库作品数（权重最高，体现数字化保护优先级）\n' +
+            '  A  研学活动场次（"活态传承"的直接度量）\n' +
+            '  E  累计报名人次（社会参与度）\n' +
+            '  L  国家级 20 / 省级 14 / 市级 9 / 县级 5\n' +
+            '  B  濒危项目额外 +12（抢救性保护加权）';
+        document.getElementById('heat-note').innerHTML =
+            '<b>模型解读：</b>权重满足 D &gt; W、A &gt; E &gt; W，即"数字化入库"优于"仅归档"、' +
+            '"有人参与的活态传承"优于"静态收藏"，与"见人见物见生活"的保护理念一致。';
+
+        renderHeatDetail(S.heat.slice(0, 3));
+
+        /* 濒危项目 */
+        var end = S.heat.filter(function (p) { return p.project_status === '濒危'; });
+        HUI.table(document.getElementById('tbl-endangered'), [
+            { key: 'project_code', label: '编号', mono: true, width: '86px' },
+            { key: 'project_name', label: '项目名称' },
+            { key: 'project_level', label: '级别', width: '70px', render: function (r) { return '<span class="badge red">' + r.project_level + '</span>'; } },
+            { key: 'inheritor_count', label: '传承人', align: 'right', width: '64px' },
+            { key: 'heat_score', label: '热度', align: 'right', width: '64px', render: function (r) { return '<b>' + r.heat_score.toFixed(1) + '</b>'; } }
+        ], end, { emptyText: '暂无论为濒危的项目' });
+
+        /* 传承人代际风险 */
+        var risk = S.inheritors.filter(function (i) {
+            return (i.age >= 70) || i.health_status === '较差' || i.health_status === '已故';
+        }).sort(function (a, b) { return b.age - a.age; });
+        HUI.table(document.getElementById('tbl-risk'), [
+            { key: 'inheritor_name', label: '姓名', width: '76px' },
+            { key: 'inheritor_code', label: '编号', mono: true, width: '92px' },
+            { key: 'age', label: '年龄', align: 'right', width: '58px', render: function (r) { return '<b>' + r.age + '</b>'; } },
+            { key: 'project_names', label: '传承项目' },
+            { key: 'health_status', label: '健康', width: '68px', render: function (r) {
+                var cls = r.health_status === '健康' ? 'green' : (r.health_status === '已故' ? 'red' : 'gold');
+                return '<span class="badge ' + cls + '">' + r.health_status + '</span>';
+            } }
+        ], risk, { emptyText: '暂无预警' });
+    }).catch(function (e) {
+        HUI.setConnState(false, e.message);
+        HUI.toast('数据加载失败：' + e.message, 'err');
+    });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>非遗档案 · 地方非遗文化数字化保护数据库管理系统</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <div class="main">
+        <header class="topbar">
+            <div>
+                <h1>非遗档案管理</h1>
+                <div class="crumb">首页 / 非遗项目 · 传承人 · 作品数字化档案</div>
+            </div>
+            <div class="topbar-actions">
+                <span class="badge" id="topbar-conn">● 检测中</span>
+                <span class="badge teal" id="stat-hit">共 0 项</span>
+            </div>
+        </header>
+
+        <main class="content">
+
+            <!-- ============ 筛选 ============ -->
+            <div class="card section">
+                <div class="card-body">
+                    <div class="toolbar">
+                        <div class="field grow">
+                            <label>关键词（项目名称 / 档案编号 / 申报地区 / 保护单位）</label>
+                            <input type="search" id="f-kw" placeholder="如：越剧、SX-002、嵊州">
+                        </div>
+                        <div class="field">
+                            <label>项目级别</label>
+                            <select id="f-level"><option value="">全部</option></select>
+                        </div>
+                        <div class="field">
+                            <label>所属门类</label>
+                            <select id="f-cat"><option value="">全部</option></select>
+                        </div>
+                        <div class="field">
+                            <label>项目状态</label>
+                            <select id="f-status"><option value="">全部</option></select>
+                        </div>
+                        <div class="field">
+                            <label>数字化档案</label>
+                            <select id="f-digi">
+                                <option value="">全部</option>
+                                <option value="1">已建档</option>
+                                <option value="0">未建档</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>排序</label>
+                            <select id="f-sort">
+                                <option value="heat">按热度指数</option>
+                                <option value="name">按档案编号</option>
+                                <option value="year">按入选年份</option>
+                            </select>
+                        </div>
+                        <button class="btn" id="btn-reset">重置</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ 结果 ============ -->
+            <section class="section">
+                <div class="between" style="margin-bottom:12px">
+                    <h2 class="section-title mb0">项目档案<small id="res-hint">按热度指数降序</small></h2>
+                    <div class="tabs" style="border:0;margin:0">
+                        <button data-view="card" class="active">卡片视图</button>
+                        <button data-view="table">表格视图</button>
+                    </div>
+                </div>
+
+                <div id="view-card" class="grid g4"></div>
+                <div id="view-table" class="card" style="display:none"><div class="card-body tight" id="tbl-host"></div></div>
+            </section>
+
+        </main>
+    </div>
+</div>
+
+<div id="toast-host"></div>
+
+<script src="assets/js/snapshot.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+    HUI.renderSidebar('projects.html');
+
+    var ALL = [], CATS = [], ENUMS = {};
+
+    function filtered() {
+        var kw = document.getElementById('f-kw').value.trim().toLowerCase();
+        var level = document.getElementById('f-level').value;
+        var cat = document.getElementById('f-cat').value;
+        var status = document.getElementById('f-status').value;
+        var digi = document.getElementById('f-digi').value;
+        var sort = document.getElementById('f-sort').value;
+
+        var list = ALL.filter(function (p) {
+            if (kw) {
+                var hay = [p.project_name, p.project_code, p.declared_area, p.protect_unit].join(' ').toLowerCase();
+                if (hay.indexOf(kw) < 0) return false;
+            }
+            if (level && p.project_level !== level) return false;
+            if (status && p.project_status !== status) return false;
+            if (cat && String(p.category_id) !== cat && String(p.parent_category_id) !== cat) return false;
+            if (digi && String(p.is_digitized) !== digi) return false;
+            return true;
+        });
+
+        if (sort === 'heat') list.sort(function (a, b) { return b.heat_score - a.heat_score; });
+        else if (sort === 'name') list.sort(function (a, b) { return a.project_code < b.project_code ? -1 : 1; });
+        else list.sort(function (a, b) { return (b.approval_year || 0) - (a.approval_year || 0); });
+        return list;
+    }
+
+    function gradeBadge(p) {
+        return '<span class="badge grade ' + p.heat_grade + '" title="' + p.heat_label + '">' + p.heat_grade + '</span>';
+    }
+
+    function levelBadge(lv) {
+        var map = { '国家级': 'red', '省级': 'gold', '市级': 'teal', '县级': '' };
+        return '<span class="badge ' + (map[lv] || '') + '">' + lv + '</span>';
+    }
+
+    function render() {
+        var list = filtered();
+        document.getElementById('stat-hit').textContent = '共 ' + list.length + ' 项';
+
+        document.getElementById('view-card').innerHTML = list.map(function (p) {
+            return '<article class="pcard" data-pid="' + p.project_id + '">' +
+                     '<div class="pc-top">' +
+                       '<div><div class="pc-name">' + HUI.esc(p.project_name) + '</div>' +
+                         '<div class="pc-code">' + p.project_code + '</div></div>' +
+                       gradeBadge(p) +
+                     '</div>' +
+                     '<div class="pc-meta">' + levelBadge(p.project_level) +
+                       '<span class="badge">' + HUI.esc(p.category_name) + '</span>' +
+                       (p.project_status === '濒危' ? '<span class="badge red">濒危</span>' : '') +
+                       (p.is_digitized ? '<span class="badge green">已数字化建档</span>' : '<span class="badge">未建档</span>') +
+                     '</div>' +
+                     '<div class="muted" style="font-size:12px">' + HUI.esc(p.declared_area) + ' · ' +
+                       HUI.esc(p.protect_unit || '—') + '</div>' +
+                     '<div class="pc-stats">' +
+                       '<span>传承人 <b>' + p.inheritor_count + '</b></span>' +
+                       '<span>作品 <b>' + p.work_count + '</b></span>' +
+                       '<span>活动 <b>' + p.activity_count + '</b></span>' +
+                       '<span style="margin-left:auto">热度 <b style="color:#a4342a">' + p.heat_score.toFixed(1) + '</b></span>' +
+                     '</div>' +
+                   '</article>';
+        }).join('') || '<div class="empty" style="grid-column:1/-1">没有符合条件的非遗项目</div>';
+
+        document.getElementById('view-card').querySelectorAll('.pcard').forEach(function (el) {
+            el.addEventListener('click', function () { openDetail(el.dataset.pid); });
+        });
+
+        HUI.table(document.getElementById('tbl-host'), [
+            { key: 'project_code', label: '档案编号', mono: true, width: '92px' },
+            { key: 'project_name', label: '项目名称' },
+            { key: 'category_name', label: '所属门类', width: '120px' },
+            { key: 'project_level', label: '级别', width: '76px', render: function (r) { return levelBadge(r.project_level); } },
+            { key: 'declared_area', label: '申报地区' },
+            { key: 'approval_year', label: '入选年', align: 'right', width: '70px' },
+            { key: 'inheritor_count', label: '传承人', align: 'right', width: '68px' },
+            { key: 'work_count', label: '作品', align: 'right', width: '56px' },
+            { key: 'activity_count', label: '活动', align: 'right', width: '56px' },
+            { key: 'registration_count', label: '报名', align: 'right', width: '56px' },
+            { key: 'heat_score', label: '热度', align: 'right', width: '72px', render: function (r) { return '<b>' + r.heat_score.toFixed(1) + '</b>'; } },
+            { key: 'heat_grade', label: '等级', width: '58px', render: gradeBadge }
+        ], list, { onRow: function (r) { openDetail(r.project_id); }, emptyText: '没有符合条件的非遗项目' });
+    }
+
+    /* ------------------------------------------------- 项目详情抽屉 */
+    function openDetail(pid) {
+        HUI.drawer('加载中…', '正在调用存储过程 sp_project_full_profile', '<div class="empty">读取项目完整档案…</div>');
+        HDATA.projectDetail(pid).then(function (d) {
+            if (!d) { HUI.closeDrawer(); HUI.toast('未能读取项目档案', 'err'); return; }
+            var b = (d.basic || [])[0] || {};
+            var heat = d.heat || {};
+
+            var head = '<div class="grid g4">' +
+                mini('关联传承人', b.inheritor_count + ' 人') +
+                mini('归档作品', b.work_count + ' 件（已入库 ' + b.digitized_work_count + '）') +
+                mini('研学课程', b.course_count + ' 门') +
+                mini('活动 / 报名', b.activity_count + ' 场 / ' + b.registration_count + ' 人次') +
+              '</div>';
+
+            var body =
+              head +
+              '<div class="mt20"></div>' +
+              '<div class="tabs">' +
+                '<button data-tab="t1" class="active">① 基础档案</button>' +
+                '<button data-tab="t2">② 关联传承人 (' + (d.inheritors || []).length + ')</button>' +
+                '<button data-tab="t3">③ 作品与数字化 (' + (d.works || []).length + ')</button>' +
+                '<button data-tab="t4">④ 研学活动 (' + (d.activities || []).length + ')</button>' +
+              '</div>' +
+              '<div class="tab-panel active" data-tab="t1">' +
+                '<div class="card"><div class="card-body">' +
+                  '<dl class="dl">' +
+                    row('项目级别', levelBadge(b.project_level) + ' ' + HUI.esc(b.batch_no || '')) +
+                    row('所属门类', (b.parent_category_name
+                        ? HUI.esc(b.parent_category_name) + ' / ' + HUI.esc(b.category_name)
+                        : HUI.esc(b.category_name))) +
+                    row('申报地区', HUI.esc(b.declared_area)) +
+                    row('保护单位', HUI.esc(b.protect_unit || '—')) +
+                    row('入选年份', HUI.esc(b.approval_year)) +
+                    row('项目状态', b.project_status === '濒危'
+                        ? '<span class="badge red">濒危</span>' : '<span class="badge green">' + HUI.esc(b.project_status) + '</span>') +
+                    row('数字化状态', HUI.esc(b.digitize_text)) +
+                    row('规模指标', '传承人 <b>' + b.inheritor_count + '</b> 人 · 作品 <b>' + b.work_count +
+                        '</b> 件（已入库 <b>' + b.digitized_work_count + '</b> 件）· 课程 <b>' + b.course_count +
+                        '</b> 门 · 活动 <b>' + b.activity_count + '</b> 场 · 累计报名 <b>' + b.registration_count + '</b> 人次') +
+                  '</dl>' +
+                '</div></div>' +
+                '<h3 class="section-title mt20" style="font-size:13.5px">热度指数分项拆解</h3>' +
+                heatBars(heat.detail, heat.score) +
+              '</div>' +
+              '<div class="tab-panel" data-tab="t2"><div id="dt-inh"></div></div>' +
+              '<div class="tab-panel" data-tab="t3"><div id="dt-work"></div></div>' +
+              '<div class="tab-panel" data-tab="t4"><div id="dt-act"></div></div>';
+
+            var sub = b.project_code + ' · ' + HUI.esc(b.declared_area) + ' · ' +
+                      HUI.esc(b.protect_unit || '—') +
+                      '　|　热度指数 <b style="color:#a4342a">' + heat.score + '</b>（' +
+                      heat.grade + ' 级 · ' + heat.label + '）';
+            HUI.drawer(HUI.esc(b.project_name), sub, body);
+            HUI.tabs(document.querySelector('.drawer'));
+
+            HUI.table(document.getElementById('dt-inh'), [
+                { key: 'inheritor_code', label: '编号', mono: true, width: '92px' },
+                { key: 'inheritor_name', label: '姓名', width: '76px' },
+                { key: 'gender', label: '性别', width: '52px' },
+                { key: 'age', label: '年龄', align: 'right', width: '56px' },
+                { key: 'inheritor_level', label: '级别', width: '72px', render: function (r) { return levelBadge(r.inheritor_level); } },
+                { key: 'region', label: '所属地区' },
+                { key: 'health_status', label: '健康', width: '68px' },
+                { key: 'relation_role', label: '项目内角色', width: '110px' },
+                { key: 'is_master', label: '主传承人', width: '82px', render: function (r) {
+                    return r.is_master === '是' ? '<span class="badge red">是</span>' : '<span class="muted">否</span>'; } }
+            ], d.inheritors || [], { emptyText: '该项目暂无关联传承人' });
+
+            HUI.table(document.getElementById('dt-work'), [
+                { key: 'work_code', label: '作品编号', mono: true, width: '96px' },
+                { key: 'work_name', label: '作品名称' },
+                { key: 'creator_name', label: '创作传承人', width: '96px' },
+                { key: 'create_year', label: '年份', align: 'right', width: '60px' },
+                { key: 'material', label: '材质', width: '110px' },
+                { key: 'digitize_status', label: '数字化进度', width: '96px', render: function (r) {
+                    var map = { '未数字化': '', '已采集': 'teal', '已建模': 'violet', '已入库': 'green' };
+                    return '<span class="badge ' + (map[r.digitize_status] || '') + '">' + r.digitize_status + '</span>'; } },
+                { key: 'collection_text', label: '入藏', width: '72px' },
+                { key: 'image_url', label: '数字资源', mono: true, render: function (r) {
+                    return r.image_url === '—' ? '<span class="muted">—</span>' : HUI.esc(r.image_url); } }
+            ], d.works || [], { emptyText: '该项目暂无归档作品' });
+
+            HUI.table(document.getElementById('dt-act'), [
+                { key: 'activity_code', label: '活动编号', mono: true, width: '96px' },
+                { key: 'activity_name', label: '活动名称' },
+                { key: 'teacher_name', label: '主讲', width: '76px' },
+                { key: 'start_time', label: '开始时间', width: '126px' },
+                { key: 'plan_capacity', label: '计划', align: 'right', width: '56px' },
+                { key: 'confirmed_total', label: '报名', align: 'right', width: '56px' },
+                { key: 'enroll_rate', label: '报名率', align: 'right', width: '70px' },
+                { key: 'activity_status', label: '状态', width: '76px', render: function (r) {
+                    var map = { '报名中': 'green', '已满员': 'red', '已结束': '', '已取消': '' };
+                    return '<span class="badge ' + (map[r.activity_status] || '') + '">' + r.activity_status + '</span>'; } }
+            ], d.activities || [], { emptyText: '该项目暂无研学活动' });
+        }).catch(function (e) {
+            HUI.closeDrawer();
+            HUI.toast('读取失败：' + e.message, 'err');
+        });
+    }
+
+    function row(k, v) { return '<dt>' + k + '</dt><dd>' + v + '</dd>'; }
+
+    function mini(label, value) {
+        return '<div class="card" style="padding:11px 13px"><div class="muted" style="font-size:12px">' + label +
+               '</div><div style="font-size:16px;font-weight:700">' + value + '</div></div>';
+    }
+
+    function heatBars(detail, total) {
+        var meta = [
+            ['作品数 × 2.0', detail.work_part, '#a4342a'],
+            ['数字化入库 × 3.0', detail.digitized_part, '#1f5a63'],
+            ['活动场次 × 4.0', detail.activity_part, '#b0813a'],
+            ['报名人次 × 1.5', detail.enroll_part, '#2f7a55'],
+            ['级别权重', detail.level_part, '#5b4b8a'],
+            ['濒危保护加权', detail.endangered_part, '#c9533f']
+        ];
+        var max = Math.max.apply(null, meta.map(function (m) { return m[1]; }).concat([1]));
+        return '<div class="card"><div class="card-body">' + meta.map(function (m) {
+            var pct = m[1] / max * 100;
+            return '<div class="flex" style="gap:12px;margin-bottom:9px">' +
+                     '<span style="width:132px;font-size:12.5px;color:#5c554d">' + m[0] + '</span>' +
+                     '<div class="bar" style="flex:1"><i style="width:' + pct + '%;background:' + m[2] + '"></i></div>' +
+                     '<b style="width:56px;text-align:right;font-size:12.5px">+' + m[1].toFixed(1) + '</b>' +
+                   '</div>';
+        }).join('') + '<div class="between" style="border-top:1px dashed #eee7dd;padding-top:10px;margin-top:4px">' +
+             '<b>合计热度指数</b><span class="score-pill" style="font-size:18px">' + total + '<small>分</small></span></div>' +
+             '</div></div>';
+    }
+
+    /* ------------------------------------------------- 初始化 */
+    function bind() {
+        ['f-kw', 'f-level', 'f-cat', 'f-status', 'f-digi', 'f-sort'].forEach(function (id) {
+            var el = document.getElementById(id);
+            el.addEventListener(id === 'f-kw' ? 'input' : 'change', render);
+        });
+        document.getElementById('btn-reset').addEventListener('click', function () {
+            ['f-kw', 'f-level', 'f-cat', 'f-status', 'f-digi'].forEach(function (id) {
+                document.getElementById(id).value = '';
+            });
+            document.getElementById('f-sort').value = 'heat';
+            render();
+        });
+        document.querySelectorAll('[data-view]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                document.querySelectorAll('[data-view]').forEach(function (x) { x.classList.remove('active'); });
+                b.classList.add('active');
+                var card = b.dataset.view === 'card';
+                document.getElementById('view-card').style.display = card ? '' : 'none';
+                document.getElementById('view-table').style.display = card ? 'none' : '';
+            });
+        });
+    }
+
+    Promise.all([
+        HDATA.get('/api/projects', { size: 200, sort: 'heat' }),
+        HDATA.get('/api/categories'),
+        HDATA.get('/api/meta/enums')
+    ]).then(function (res) {
+        ALL = res[0] || []; CATS = res[1] || []; ENUMS = res[2] || {};
+        HUI.setConnState(HDATA.online, HDATA.message);
+
+        document.getElementById('f-level').innerHTML =
+            '<option value="">全部</option>' + (ENUMS.project_level || []).map(function (v) {
+                return '<option>' + v + '</option>'; }).join('');
+        document.getElementById('f-status').innerHTML =
+            '<option value="">全部</option>' + (ENUMS.project_status || []).map(function (v) {
+                return '<option>' + v + '</option>'; }).join('');
+
+        var opts = [''].concat([]);
+        var html = '<option value="">全部</option>';
+        CATS.forEach(function (c) {
+            html += '<option value="' + c.category_id + '">' + HUI.esc(c.category_name) + '（大门类）</option>';
+            (c.children || []).forEach(function (s) {
+                html += '<option value="' + s.category_id + '">&nbsp;&nbsp;└ ' + HUI.esc(s.category_name) + '</option>';
+            });
+        });
+        document.getElementById('f-cat').innerHTML = html;
+
+        bind();
+        render();
+
+        // 支持通过 URL 参数直接打开某个项目的档案抽屉，便于分享与演示
+        // 例：projects.html?pid=1
+        var pid = new URLSearchParams(location.search).get('pid');
+        if (pid) { openDetail(pid); }
+    }).catch(function (e) {
+        HUI.setConnState(false, e.message);
+        HUI.toast('数据加载失败：' + e.message, 'err');
+    });
+})();
+</script>
+</body>
+</html>
