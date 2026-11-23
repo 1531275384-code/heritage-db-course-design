@@ -1,7 +1,7 @@
 # 非遗数字资产分级确权与溯源 AI 工具
 
-> **本仓库当前分支：`iteration/ai-traceability`（迭代版 v2）。**
-> 课程设计原版（v1，MySQL + Flask）在 [`main`](https://github.com/1531275384-code/heritage-db-course-design/tree/main) 分支。
+> **本仓库默认分支：`iteration/ai-traceability`（迭代版 v2，即当前首页）。**
+> 课程设计原版（v1，MySQL + Flask）保留在 [`main`](https://github.com/1531275384-code/heritage-db-course-design/tree/main) 分支。
 > 两个版本的演进关系、技术栈差异与新增能力见 [迭代说明.md](迭代说明.md)。
 
 面向文旅部门、非遗传承人、知识产权监管机构的一套可运行系统。
