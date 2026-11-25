@@ -3,6 +3,7 @@
 --  执行：psql -U postgres -d ich_heritage -v ON_ERROR_STOP=1 -f sql/03_seed.sql
 --
 --  说明：
+--   - 本系统样例纹样与传承人数据均为课程设计模拟数据，不代表真实人物或法律意见
 --   - 三个示例用户口令统一为 Passw0rd!（演示用，生产环境务必改为随机强口令）
 --   - 三个公有母题预置了「占位特征向量」，启动服务后执行
 --       python -m app.cli backfill-motif-vectors

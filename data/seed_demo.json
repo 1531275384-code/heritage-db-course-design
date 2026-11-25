@@ -5,6 +5,7 @@
     "purpose": "让前端一启动就有可看的数据：4 个账号各带作品、3 条公有母题、预置审核流水与授权记录、完整溯源链。",
     "how_it_loads": "app/demo.py 的 DemoStore.reset() 读取本文件；ICH_DEMO_SEED=off 可关闭。",
     "important": [
+      "本系统样例纹样与传承人数据均为课程设计模拟数据。AI 相似度检索仅作初筛参考，不具备法律效力；分级建议须经专家人工审核。",
       "★ ai_suggest_level / ai_confidence 不是编的，是 builtin 特征后端（HOG+HSV+Laplacian, 512 维）对这张图算出的真实结果。改了图片就要重新跑一次校验（python -m scripts.check_seed），否则会出现「种子说 derived、实际算出来 public」的漂移。",
       "asset.file_path 是相对 data/uploads/ 的文件名，由 scripts/make_seed_images.py 生成。",
       "seed 作品不走 upload→analyze 流程，向量在启动时由 warm_asset_vectors() 现算，算法与线上完全一致。",
@@ -185,7 +186,7 @@
           "expert_id": 2,
           "top_motif_id": 1,
           "is_override": false,
-          "opinion": "最相似母题为 MO-001 蝴蝶纹，相似度 0.4486，远低于 0.80 阈值，构图与纹样组织方式均无实质重合。确认为原创作品，授予完整著作权登记。",
+          "opinion": "AI 初筛：最相似母题为 MO-001 蝴蝶纹，相似度 0.4486。该结果仅供参考，不具备法律效力；分级建议由专家人工审核。",
           "days_ago": 27,
           "decided_days_ago": 25,
           "similarity": 0.4486
