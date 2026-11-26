@@ -7,7 +7,7 @@
 
 来源指纹（前 16 位）
   sql/01_init.sql                f0cc7cfc4b52eee2
-  sql/02_index_trigger_view.sql  1aa6b8d2487fb553
+  sql/02_index_trigger_view.sql  41855524999d8f88
 
 规则计数：CHECK 24 / UNIQUE 4 / 外键 12 / 触发器 9
 
@@ -41,7 +41,7 @@ from sim.ruleast import (
 )
 
 SOURCE_FILES = ('sql/01_init.sql', 'sql/02_index_trigger_view.sql')
-SOURCE_SHA256 = {'sql/01_init.sql': 'f0cc7cfc4b52eee2', 'sql/02_index_trigger_view.sql': '1aa6b8d2487fb553'}
+SOURCE_SHA256 = {'sql/01_init.sql': 'f0cc7cfc4b52eee2', 'sql/02_index_trigger_view.sql': '41855524999d8f88'}
 
 # ==========================================================================
 #  枚举取值域（由 CREATE TYPE ... AS ENUM 决定）

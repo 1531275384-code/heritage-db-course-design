@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -51,12 +52,20 @@ DSN = os.environ.get(
 # 「索引不可用」的结论就下不了
 NO_INDEX = "SET LOCAL enable_indexscan = off; SET LOCAL enable_bitmapscan = off"
 
+# EXPLAIN 会把查询里的向量字面量整条打出来（512 维 ≈ 5KB 一行），
+# 报告里既读不了也没必要。保留维度信息，正文省略。
+_VEC_LITERAL = re.compile(r"'\[[-0-9eE.,\s]{60,}\]'")
+
+
+def _trim_vector_literal(plan: str) -> str:
+    return _VEC_LITERAL.sub("'[<512 维向量字面量已省略>]'", plan)
+
 
 def explain(cur, sql: str, params=None) -> tuple[str, float | None]:
     """执行 EXPLAIN (ANALYZE, BUFFERS)，返回 (计划全文, 执行毫秒)。"""
     cur.execute("EXPLAIN (ANALYZE, BUFFERS, COSTS ON, TIMING ON) " + sql, params)
     lines = [r[0] for r in cur.fetchall()]
-    plan = "\n".join(lines)
+    plan = _trim_vector_literal("\n".join(lines))
     ms = None
     for line in lines:
         if line.strip().startswith("Execution Time:"):
@@ -97,10 +106,46 @@ def run_case(cur, name: str, desc: str, sql: str, params=None, available=True,
     }
 
 
+def seed_synthetic(cur, n: int) -> None:
+    """在**当前事务内**合成 n 条纹样向量，供规模测试使用。
+
+    为什么要合成
+    ------------
+    种子库只有 3 条母题，优化器必然选顺序扫描——这是正确选择，但无法回答
+    「HNSW 在数据量上来后到底省多少」。规模结论不能靠 3 行数据外推。
+
+    为什么不落库
+    ------------
+    调用方在事务内执行本函数，脚本结束时整笔 ROLLBACK，索引条目与数据页一起撤销，
+    不会污染演示库，也不需要事后清理。（HNSW 索引是 WAL 记录的，回滚同样生效。）
+    """
+    import io
+
+    import numpy as np
+
+    rng = np.random.default_rng(20261126)  # 固定种子：换机器也能复现同一批向量
+    print(f"  合成 {n} 条 512 维纹样向量（事务内，结束即回滚）...", flush=True)
+    buf = io.StringIO()
+    for i in range(1, n + 1):
+        v = rng.standard_normal(512).astype("float32")
+        v /= np.linalg.norm(v) or 1.0
+        buf.write(f"SYN-{i}\t合成纹样 {i}\t合成\t[{','.join(f'{x:.6f}' for x in v)}]\tsynthetic\n")
+    buf.seek(0)
+    cur.copy_expert(
+        "COPY public_motif (motif_code, name, region, base_vector, vector_model) "
+        "FROM STDIN", buf
+    )
+    cur.execute("ANALYZE public_motif")  # 不 ANALYZE 的话统计信息还停在 3 行
+    print("  合成数据已就绪（统计信息已更新）")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="EXPLAIN (ANALYZE, BUFFERS) 性能采集")
     ap.add_argument("--out", default=str(BASE / "docs" / "verify"), help="输出目录")
     ap.add_argument("--only", default="", help="只跑指定场景：vector/queue/ledger")
+    ap.add_argument("--synthetic", type=int, default=0, metavar="N",
+                    help="额外合成 N 条纹样向量做规模测试（事务内，结束回滚）；"
+                         "仅在 pgvector 原生模式下有效")
     args = ap.parse_args(argv)
 
     conn = psycopg2.connect(DSN)
@@ -143,6 +188,26 @@ def main(argv: list[str] | None = None) -> int:
                 available=False,
                 skip_reason="降级模式无 pgvector：无 <=> 运算符与 HNSW 索引，"
                             "精确扫描耗时不能代表向量检索性能"))
+
+    # ------------------------------------------------ 向量近邻（合成规模对照）
+    # 种子库只有 3 条母题，无论索引建得多好，优化器都会选顺序扫描。
+    # 所以规模结论必须另造数据：合成 → ANALYZE → 采集 → 随事务回滚。
+    if "vector" in want and args.synthetic:
+        if not native:
+            print(f"  - vector_knn_syn{args.synthetic}: SKIPPED（降级模式无 HNSW，"
+                  f"合成数据无法体现索引收益）")
+        else:
+            seed_synthetic(cur, args.synthetic)
+            cur.execute("""SELECT base_vector::text FROM public_motif
+                           WHERE vector_model='synthetic' LIMIT 1""")
+            probe_syn = cur.fetchone()
+            results.append(run_case(
+                cur, f"vector_knn_syn{args.synthetic}",
+                f"母题库向量近邻检索（HNSW / cosine，合成 {args.synthetic} 行对照）",
+                "SELECT motif_id, name FROM public_motif "
+                "ORDER BY base_vector <=> %s::vector LIMIT 5",
+                (probe_syn[0],),
+            ))
 
     # ---------------------------------------------------------------- 待审队列
     if "queue" in want:
@@ -192,6 +257,9 @@ def main(argv: list[str] | None = None) -> int:
         "不代表线上实际计划。",
         "",
     ]
+    if any("_syn" in c["name"] for c in results):
+        lines.insert(5, "- 规模对照：`vector_knn_syn*` 的合成数据在事务内生成，"
+                        "脚本结束时整笔回滚，**未落库**；固定随机种子可复现")
     for c in results:
         lines.append(f"## {c['name']} —— {c['desc']}")
         lines.append("")

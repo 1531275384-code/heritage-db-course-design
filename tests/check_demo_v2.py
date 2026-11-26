@@ -20,6 +20,9 @@ import sys
 
 from playwright.async_api import async_playwright
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from browser_launch import launch_async  # noqa: E402
+
 BASE = pathlib.Path(__file__).resolve().parent.parent
 PAGE = BASE / "output" / "01-交付物" / "演示页面_互动版.html"
 SHOTS = BASE / "output" / "02-截图证据" / "互动版验收"
@@ -75,7 +78,7 @@ async def main() -> int:
     page_errs: list[str] = []
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch()
+        browser = await launch_async(p)
         page = await browser.new_page(viewport={"width": 1440, "height": 900})
         page.on("console", lambda m: console_errs.append(m.text) if m.type == "error" else None)
         page.on("pageerror", lambda e: page_errs.append(str(e)))

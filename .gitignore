@@ -29,3 +29,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# 运行时上传：种子演示图已入库，这里忽略测试/演示过程中新产生的副本
+data/uploads/*

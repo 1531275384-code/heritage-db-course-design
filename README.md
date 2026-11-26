@@ -72,6 +72,12 @@
 `pgvector` 在 Windows 上没有官方预编译包，要自己用 MSVC 编译，这是本项目最容易卡住的一步。
 `docker-compose.yml` 已经配好：镜像是 **`pgvector/pgvector:pg16`**，扩展预装，不用编译。
 
+> **没有 Docker 也想拿到原生 pgvector？** 用 portable 的 `micromamba` 从 conda-forge 装一份
+> 同 ABI 的 MSVC 构建即可（16.15 + pgvector 0.8.6 已在 Windows 本机验证）：
+> `micromamba create -p ./pgvec -c conda-forge "postgresql=16" pgvector`。
+> 完整步骤与本机踩到的两个坑（Temp 目录 DLL 被应用控制策略拦截、pgcrypto 需换用 EDB 同名 DLL）
+> 见 [`docs/verify/验收记录-20261126.md`](docs/verify/验收记录-20261126.md)。
+
 ```bash
 # ① 装 Python 依赖
 python -m venv .venv

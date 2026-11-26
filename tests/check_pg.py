@@ -348,6 +348,16 @@ def main() -> int:
         case.cur.execute("ROLLBACK TO SAVEPOINT r1")
     check(blocked, "传承人无法 UPDATE asset（更无法改权属）", detail)
 
+    # 重算覆盖路径：analyze_asset 先 DELETE 同资产同模型的旧向量再 INSERT。
+    # 只验证「能 INSERT」会漏掉 DELETE —— 首次分析能过，第二次分析才炸 42501。
+    case.cur.execute(
+        "SELECT has_table_privilege('ich_heritor','feature_vector','DELETE'),"
+        "       has_table_privilege('ich_heritor','feature_vector','INSERT')")
+    can_del, can_ins = case.cur.fetchone()
+    check(can_ins and can_del,
+          "传承人可覆盖自己资产的特征向量（INSERT + DELETE 齐备）",
+          f"INSERT={can_ins} DELETE={can_del}")
+
     # ------------------------------------------------------------------ 8 并发
     section("8 并发控制")
     conn.commit()
@@ -378,24 +388,43 @@ def main() -> int:
     native = cur.fetchone()[0]
     print(f"    当前模式：{'pgvector 原生' if native else '降级（NUMERIC[] + 精确扫描）'}")
 
-    cur.execute("SELECT ich_cosine_distance(ARRAY[1,0]::numeric[], ARRAY[1,0]::numeric[])")
-    d_same = float(cur.fetchone()[0])
-    cur.execute("SELECT ich_cosine_distance(ARRAY[1,0]::numeric[], ARRAY[-1,0]::numeric[])")
-    d_opp = float(cur.fetchone()[0])
-    cur.execute("SELECT ich_cosine_distance(ARRAY[1,0]::numeric[], ARRAY[0,1]::numeric[])")
-    d_orth = float(cur.fetchone()[0])
-    check(abs(d_same - 0) < 1e-9, "同向 cosine 距离 = 0", f"{d_same}")
-    check(abs(d_opp - 2) < 1e-9, "反向 cosine 距离 = 2", f"{d_opp}")
-    check(abs(d_orth - 1) < 1e-9, "正交 cosine 距离 = 1", f"{d_orth}")
+    # 两种模式的语义必须等价，但**实现不是同一套**：
+    #   降级模式 → 00_compat_vector.sql 里的 ich_cosine_distance(numeric[], numeric[])
+    #   原生模式 → pgvector 的 <=> (vector_spaces / cosine)，兼容层按设计不注册同名函数
+    # 早先这里无条件调用 ich_cosine_distance，在原生模式下直接 UndefinedFunction 崩掉，
+    # 等于原生路径从未被执行过。故按模式分流，两边都给出同口径的距离断言。
+    if native:
+        def dist(a: str, b: str) -> float:
+            cur.execute(f"SELECT '{a}'::vector <=> '{b}'::vector")
+            return float(cur.fetchone()[0])
 
-    cur.execute("SELECT l2_normalize(ARRAY[3,4]::numeric[])")
-    vec = cur.fetchone()[0]
-    check(abs(float(vec[0]) - 0.6) < 1e-6 and abs(float(vec[1]) - 0.8) < 1e-6,
-          "l2_normalize([3,4]) = [0.6, 0.8]", f"{vec}")
+        d_same, d_opp, d_orth = dist("[1,0]", "[1,0]"), dist("[1,0]", "[-1,0]"), dist("[1,0]", "[0,1]")
+        check(abs(d_same - 0) < 1e-9, "同向 cosine 距离 = 0（<=>）", f"{d_same}")
+        check(abs(d_opp - 2) < 1e-9, "反向 cosine 距离 = 2（<=>）", f"{d_opp}")
+        check(abs(d_orth - 1) < 1e-9, "正交 cosine 距离 = 1（<=>）", f"{d_orth}")
 
-    ok, code, msg = case.expect_error(
-        "SELECT ich_cosine_distance(ARRAY[1,0]::numeric[], ARRAY[1,0,0]::numeric[])")
-    check(ok, "维度不一致时拒绝计算", msg)
+        # 维度不一致必须报错，而不是静默截断/补零
+        ok, code, msg = case.expect_error("SELECT '[1,0]'::vector <=> '[1,0,0]'::vector")
+        check(ok, "维度不一致时拒绝计算（<=>）", msg)
+    else:
+        cur.execute("SELECT ich_cosine_distance(ARRAY[1,0]::numeric[], ARRAY[1,0]::numeric[])")
+        d_same = float(cur.fetchone()[0])
+        cur.execute("SELECT ich_cosine_distance(ARRAY[1,0]::numeric[], ARRAY[-1,0]::numeric[])")
+        d_opp = float(cur.fetchone()[0])
+        cur.execute("SELECT ich_cosine_distance(ARRAY[1,0]::numeric[], ARRAY[0,1]::numeric[])")
+        d_orth = float(cur.fetchone()[0])
+        check(abs(d_same - 0) < 1e-9, "同向 cosine 距离 = 0", f"{d_same}")
+        check(abs(d_opp - 2) < 1e-9, "反向 cosine 距离 = 2", f"{d_opp}")
+        check(abs(d_orth - 1) < 1e-9, "正交 cosine 距离 = 1", f"{d_orth}")
+
+        cur.execute("SELECT l2_normalize(ARRAY[3,4]::numeric[])")
+        vec = cur.fetchone()[0]
+        check(abs(float(vec[0]) - 0.6) < 1e-6 and abs(float(vec[1]) - 0.8) < 1e-6,
+              "l2_normalize([3,4]) = [0.6, 0.8]", f"{vec}")
+
+        ok, code, msg = case.expect_error(
+            "SELECT ich_cosine_distance(ARRAY[1,0]::numeric[], ARRAY[1,0,0]::numeric[])")
+        check(ok, "维度不一致时拒绝计算", msg)
 
     # ------------------------------------------------------------------ 10 HNSW
     section("10 向量索引（pgvector / HNSW）")
@@ -431,28 +460,45 @@ def main() -> int:
         for idxname, (tab, col, pk) in WANTED_IDX.items():
             cur.execute(f"SELECT count(*) FROM {tab}")
             n_row = cur.fetchone()[0]
+            # 空表时新装的库还没上传过资产特征，feature_vector 天然是 0 行。
+            # 这种情况下不能只记 GAP 了事——索引是否真的可被近邻查询选中，
+            # 是可以用「事务内临时探针行 + 用完回滚」验证的，不落任何数据。
+            cur.execute("SAVEPOINT probe")
             cur.execute(f"SELECT {col}::text FROM {tab} LIMIT 1")
             probe = cur.fetchone()
+            synthesized = False
             if probe is None:
+                cur.execute("""INSERT INTO feature_vector
+                                   (asset_id, model_name, model_version, embed_dim, embedding)
+                               SELECT asset_id, 'check_pg_probe', '0', 512,
+                                      (SELECT base_vector FROM public_motif
+                                        WHERE base_vector IS NOT NULL LIMIT 1)
+                               FROM asset ORDER BY asset_id LIMIT 1""")
+                if cur.rowcount:
+                    synthesized = True
+                    cur.execute(f"SELECT {col}::text FROM {tab} LIMIT 1")
+                    probe = cur.fetchone()
+            if probe is None:
+                cur.execute("ROLLBACK TO SAVEPOINT probe")
                 gap(f"{idxname} 近邻计划未实测",
-                    f"{tab} 当前 0 行，无真实向量可做探针；索引存在但未在数据上验证")
+                    f"{tab} 当前 0 行且无法合成探针（缺少可引用的母题向量/资产行）")
                 continue
             sql = (f"SELECT {pk} FROM {tab} "
                    f"ORDER BY {col} <=> %s::vector LIMIT 5")
             # 默认设置下的计划：如实记录，作为「优化器真实选择」的观察值
             cur.execute("SELECT 1")  # 确保处于事务内，SET LOCAL 才生效
-            cur.execute("SAVEPOINT knn")
             cur.execute("EXPLAIN (COSTS OFF) " + sql, (probe[0],))
             plan_default = " | ".join(x[0].strip() for x in cur.fetchall())
             cur.execute("SET LOCAL enable_seqscan = off")
             cur.execute("EXPLAIN (COSTS OFF) " + sql, (probe[0],))
             plan_forced = " | ".join(x[0].strip() for x in cur.fetchall())
-            cur.execute("ROLLBACK TO SAVEPOINT knn")
+            cur.execute("ROLLBACK TO SAVEPOINT probe")  # 同时撤销 enable_seqscan 与探针行
 
             used_default = idxname in plan_default.lower()
             usable = idxname in plan_forced.lower()
             check(usable, f"{idxname} 可被近邻查询选中（enable_seqscan=off 验证）",
-                  f"{n_row} 行；默认计划={'命中索引' if used_default else '顺序扫描'}")
+                  f"{n_row} 行{'（+ 事务内临时探针）' if synthesized else ''}；"
+                  f"默认计划={'命中索引' if used_default else '顺序扫描'}")
             print(f"      默认计划：{plan_default[:150]}")
             print(f"      强制索引：{plan_forced[:150]}")
     else:

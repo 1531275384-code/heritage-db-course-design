@@ -17,6 +17,9 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from browser_launch import launch_async  # noqa: E402
+
 BASE = Path(__file__).resolve().parent.parent
 PAGE = BASE / "output" / "01-交付物" / "演示页面.html"
 SHOTS = BASE / "output" / "02-截图证据" / "演示页验收"
@@ -39,7 +42,7 @@ async def main() -> int:
     url = "file:///" + str(PAGE).replace("\\", "/")
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch()
+        browser = await launch_async(p)
         page = await browser.new_page(viewport={"width": 1500, "height": 940})
 
         console_errors: list[str] = []

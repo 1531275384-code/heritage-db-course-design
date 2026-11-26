@@ -31,6 +31,7 @@ _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 PASS = 0
 FAIL = 0
+SKIP = 0
 
 
 def call(method: str, path: str, token: str | None = None, body: dict | None = None) -> tuple[int, dict | list]:
@@ -93,6 +94,15 @@ def check(label: str, cond: bool, extra: str = "") -> None:
         print(f"  ✗ {label}  ← 失败  {extra}")
 
 
+def skip(label: str, reason: str) -> None:
+    """本文件默认跑演示模式（内存表）。被 ICH_DEMO_MODE=0 覆盖时，
+    少数「演示模式专有」的断言不成立，应显式跳过而不是判成失败——
+    否则真库模式跑出来的红叉会误导人以为功能坏了。"""
+    global SKIP
+    SKIP += 1
+    print(f"  ⊘ {label}  ← 跳过（{reason}）")
+
+
 def section(title: str) -> None:
     print(f"\n{'=' * 72}\n{title}\n{'=' * 72}")
 
@@ -124,11 +134,23 @@ def _seed_expected() -> dict:
 exp = _seed_expected()
 code, h = call("GET", "/api/health")
 check("GET /api/health 返回 200", code == 200, f"HTTP {code}")
-check("数据库状态明确标注为演示模式", "演示" in str(h.get("database")), str(h.get("database")))
+# 本文件默认以演示模式运行；ICH_DEMO_MODE=0 时同一个脚本也常被拿来做真库冒烟，
+# 此时「演示模式标注」「内存表规模」这类断言不适用，需要按模式分流。
+IS_DEMO = "演示" in str(h.get("database"))
+if IS_DEMO:
+    check("数据库状态明确标注为演示模式", True, str(h.get("database")))
+else:
+    skip("数据库状态明确标注为演示模式", f"真库模式：{h.get('database')}")
 tables = h.get("tables", {})
-if exp:
+if exp and IS_DEMO:
     mism = {k: (tables.get(k), v) for k, v in exp.items() if tables.get(k) != v}
     check("种子规模与 seed_demo.json 一致", not mism, f"实际/期望={mism}; 全表={tables}")
+elif exp:
+    # 真库模式下不校验绝对行数：e2e 自己会不断新增资产，跑第二次就对不上了。
+    # 只校验「演示种子确实灌进去了」的下限。
+    ok = (tables.get("app_user", 0) >= 3 and tables.get("public_motif", 0) >= 3
+          and tables.get("asset", 0) >= 8)
+    check("真库演示种子已加载（行数下限 3/3/8）", ok, f"全表={tables}")
 else:
     check("内存表行数可读", tables.get("app_user", 0) > 0, f"8 张表: {tables}")
 # 授权记录与审计日志必须已随种子写入（否则台账「授权费合计」会是 0）
@@ -138,7 +160,10 @@ check("已确权作品生成了审计日志",
       f"log={tables.get('system_audit_log')} asset={tables.get('asset')}")
 
 code, m = call("GET", "/api/meta")
-check("demo_mode 标志为 true（前端据此显示红色横幅）", m.get("demo_mode") is True)
+if IS_DEMO:
+    check("demo_mode 标志为 true（前端据此显示红色横幅）", m.get("demo_mode") is True)
+else:
+    skip("demo_mode 标志为 true", "真库模式，横幅本应关闭")
 print(f"  阈值: public<={m['thresholds']['public']}  derived<={m['thresholds']['derived']}")
 print(f"  AI 后端: {m['ai_backend']['backend']} (deep={m['ai_backend']['is_deep_model']})")
 
@@ -188,7 +213,7 @@ check("初始状态 draft，right_level 尚未确定", up["asset"]["audit_status
       f"status={up['asset']['audit_status']} level={up['asset']['right_level']}")
 
 code, an = call("POST", f"/api/asset/{aid}/analyze", token=T_H)
-check("AI 分析返回 200", code == 200, f"HTTP {code}")
+check("AI 分析返回 200", code == 200, f"HTTP {code} {str(an)[:300]}")
 check("给出分级建议", an.get("suggested_level") in ("public", "derived", "original"),
       f"建议={an.get('suggested_level')} 置信度={an.get('confidence')}")
 print(f"  规则命中: {an.get('rule')}")
@@ -200,7 +225,16 @@ check("top_k 按相似度降序", all(
     an["top_k"][i]["similarity"] >= an["top_k"][i + 1]["similarity"] for i in range(len(an["top_k"]) - 1)))
 
 last_plan = an.get("plan") or ""
-check("执行计划如实说明无 HNSW", "HNSW" in last_plan, last_plan.splitlines()[0] if last_plan else "")
+if IS_DEMO:
+    check("执行计划如实说明无 HNSW", "HNSW" in last_plan, last_plan.splitlines()[0] if last_plan else "")
+elif "hnsw" in last_plan.lower():
+    check("执行计划命中 HNSW 索引", True, last_plan.splitlines()[0])
+else:
+    # 真库 + 只有 3 条母题时优化器选顺序扫描是正确选择，不能算失败；
+    # 索引是否真的可用由 check_pg 第 10 节在 enable_seqscan=off 下单独验证。
+    check("真库返回真实执行计划（小数据量允许顺序扫描）",
+          "Scan" in last_plan or "Limit" in last_plan,
+          last_plan.splitlines()[0] if last_plan else "（空计划）")
 
 section("5. ★ 核心不变量：AI 只写建议，没碰 right_level")
 code, a = call("GET", f"/api/asset/{aid}", token=T_H)
@@ -324,6 +358,6 @@ check("同一文件再次上传命中 duplicate_of", code == 201 and dup.get("du
 
 # =============================================================================
 print(f"\n{'=' * 72}")
-print(f"  结果：{PASS} 项通过 / {FAIL} 项失败")
+print(f"  结果：{PASS} 项通过 / {FAIL} 项失败" + (f" / {SKIP} 项跳过" if SKIP else ""))
 print(f"{'=' * 72}")
 sys.exit(0 if FAIL == 0 else 1)

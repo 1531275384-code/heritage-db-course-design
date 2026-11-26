@@ -77,6 +77,9 @@ PAGE_TITLES = {
 def main(argv: list[str]) -> int:
     from playwright.sync_api import sync_playwright
 
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from browser_launch import launch_sync
+
     SHOTS.mkdir(parents=True, exist_ok=True)
 
     print("=" * 78)
@@ -89,7 +92,7 @@ def main(argv: list[str]) -> int:
     total_errors: list[str] = []
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch()
+            browser = launch_sync(p)
             for username, role_cn, pages in ACCOUNTS:
                 print(f"\n【{role_cn} {username}】")
                 page = browser.new_page(viewport={"width": 1440, "height": 980})

@@ -783,6 +783,12 @@ GRANT UPDATE (title, description, file_path, file_hash, file_size, mime_type,
               audit_status, ai_suggest_level, ai_confidence, ai_model_version, motif_id)
     ON asset TO ich_heritor;                                        -- ★ 注意：不含 right_level
 GRANT SELECT, INSERT ON feature_vector TO ich_heritor;
+-- 重算覆盖需要先删掉同资产同模型的旧向量（见 app/services.py analyze_asset 3.1）。
+-- 只给 SELECT/INSERT 的话，第二次分析必然 42501 —— 首次分析能过、重算才炸，
+-- 属于最容易被漏测的一类：单次流程永远碰不到 DELETE 那一行。
+-- 特征向量是**派生物、可重建**，越权删除他人向量只会降低检索质量，
+-- 不会改变权属或审核结论；要按人隔离需 RLS + 每用户会话变量，超出本设计范围。
+GRANT DELETE ON feature_vector TO ich_heritor;
 GRANT SELECT, INSERT ON audit_record TO ich_heritor;                -- 可提交审核申请
 GRANT SELECT ON v_asset_pending_audit, v_asset_trace_chain, v_asset_ledger TO ich_heritor;
 -- 权利人本人可登记授权。只给 INSERT 不给 UPDATE/DELETE：
