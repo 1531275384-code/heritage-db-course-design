@@ -1,0 +1,78 @@
+
+[1 结构落地]
+  ✓ [PASS] 8 张业务表存在  —— 实际 8
+  ✓ [PASS] 3 个视图存在  —— 实际 3
+  ✓ [PASS] 9 个触发器存在  —— 实际 9
+  ✓ [PASS] 3 个业务角色存在  —— 实际 3
+
+[2 枚举取值域]
+  ✓ [PASS] 非法 right_level 被枚举拒绝  —— invalid input value for enum right_level_enum: "不是枚举值"
+
+[3 CHECK 约束]
+  ✓ [PASS] file_hash 非 64 位十六进制被拒  —— new row for relation "asset" violates check constraint "ck_asset_file_hash"
+  ✓ [PASS] 置信度 > 1 被拒  —— new row for relation "asset" violates check constraint "ck_asset_ai_pair"
+
+[4 事务与持久性]
+  ✓ [PASS] ROLLBACK 后无残留  —— 残留 0 行
+
+[5 触发器与不可篡改]
+  ✓ [PASS] 已终审记录不可再修改  —— 审核记录 25 已终审(状态 approved)，不可再修改
+  ✓ [PASS] 系统审计日志禁止 UPDATE  —— 表 system_audit_log 为追加式日志，禁止 UPDATE 操作（历史不可篡改）
+  ✓ [PASS] 系统审计日志禁止 DELETE  —— 表 system_audit_log 为追加式日志，禁止 DELETE 操作（历史不可篡改）
+  ✓ [PASS] 审核记录禁止 DELETE（历史不可删）  —— 表 audit_record 为追加式日志，禁止 DELETE 操作（历史不可篡改）
+  ✓ [PASS] UPDATE asset 可执行且审计日志记录变更列  —— changed_fields=['audit_status', 'right_level']
+  ✓ [PASS] 审计日志记录业务角色而非函数属主  —— actor=ich_expert
+
+[6 授权约束]
+  ✓ [PASS] 不能自己授权给自己（ck_lic_self）  —— 资产 53 尚未终审通过（当前状态 draft），不得登记授权
+  ✓ [PASS] 非法 license_type 被拒  —— 资产 53 尚未终审通过（当前状态 draft），不得登记授权
+  ✓ [PASS] 结束日期早于开始日期被拒  —— 资产 53 尚未终审通过（当前状态 draft），不得登记授权
+
+[7 权限隔离]
+  ✓ [PASS] 存在列级授权记录  —— 499 条
+  ✓ [PASS] 传承人可登记授权（license_record INSERT）  —— 无 INSERT 权限
+  ✓ [PASS] 监管可代登记授权（license_record INSERT）  —— 无 INSERT 权限
+  ✓ [PASS] 授权记录不可 UPDATE（撤销靠新增 revoked 记录）  —— 竟然有 UPDATE 权限，追加式设计被破坏
+  ✓ [PASS] 审计触发器为 SECURITY DEFINER（业务角色无权直写审计表）  —— 仍为 INVOKER，终审会在触发器内部 permission denied
+  ✓ [PASS] 传承人无法 UPDATE asset（更无法改权属）  —— permission denied for table asset
+
+[8 并发控制]
+  ✓ [PASS] FOR UPDATE 行锁互斥（第二个会话被阻塞）  —— 第二个会话拿到 55P03（锁不可用），说明行锁真的生效
+
+[9 降级向量层语义]
+    当前模式：降级（NUMERIC[] + 精确扫描）
+  ✓ [PASS] 同向 cosine 距离 = 0  —— 0.0
+  ✓ [PASS] 反向 cosine 距离 = 2  —— 2.0
+  ✓ [PASS] 正交 cosine 距离 = 1  —— 1.0
+  ✓ [PASS] l2_normalize([3,4]) = [0.6, 0.8]  —— [Decimal('0.60000000'), Decimal('0.80000000')]
+  ✓ [PASS] 维度不一致时拒绝计算  —— 向量维度不一致：2 vs 3
+
+[10 向量索引（pgvector / HNSW）]
+  ! [GAP] HNSW 索引未实测  —— 当前为降级模式（NUMERIC[] + 精确扫描）；pgvector 扩展在本机不可用，索引与近邻计划均无法验证
+
+[11 业务规则在数据库层的落实情况]
+  ✓ [PASS] 未终审即授权被数据库拒绝（trg_license_require_approved）  —— err=23514 资产 53 尚未终审通过（当前状态 draft），不得登记授权
+  ✓ [PASS] 已驳回的资产同样不得授权  —— err=23514 资产 53 尚未终审通过（当前状态 rejected），不得登记授权
+  ✓ [PASS] 已终审资产可以正常登记授权（未误伤合法路径）  —— license_id=71
+
+[12 视图可用性]
+  ✓ [PASS] v_asset_ledger 可查询且有数据  —— 9 行
+  ✓ [PASS] v_asset_trace_chain 可查询  —— 50 行
+  ✓ [PASS] v_asset_pending_audit 可查询  —— 2 行
+
+[13 审核状态流转的角色闸门（trg_asset_status_guard）]
+  ✓ [PASS] 闸门触发器同时覆盖 INSERT 与 UPDATE  —— (True, True, 'fn_asset_status_guard', False)
+  ✓ [PASS] 传承人直连库改 approved 被触发器拒绝  —— err=42501 传承人只能把状态从 draft/rejected 推到 pending（draft → approved）
+  ✓ [PASS] 传承人上传即自封 approved 被拒绝  —— err=42501 新建资产只能是 draft + public（当前 approved + original）
+  ✓ [PASS] 传承人 draft → pending 正常放行（未误伤合法路径）
+  ✓ [PASS] 专家直改终态但未声明终审标记被拒绝  —— err=42501 终审结论必须由 approve_asset()/reject_asset() 写入（draft → approved）
+  ✓ [PASS] 专家脱离终审事务单独改权级被拒绝  —— err=42501 终审结论必须由 approve_asset()/reject_asset() 写入（draft → draft）
+  ✓ [PASS] 声明终审标记后专家可写终态（approve_asset 路径可用）
+  ✓ [PASS] 专家不得把已终审改回待审（即便带标记）  —— err=42501 资产已终审（approved），不得改回 pending
+  ✓ [PASS] 监管角色不能改审核状态（表级 GRANT 先挡，闸门是第二道）  —— err=42501 permission denied for table asset
+  ✓ [PASS] 闸门放行时审计触发器照常留痕（两条触发器共存）  —— changed_fields=['audit_status', 'right_level'] actor=ich_expert
+
+结果：45 项通过 / 0 项失败 / 1 项缺口（共 46 项）
+
+缺口明细（这些不是通过，是如实记录的未落实项）：
+  ! HNSW 索引未实测：当前为降级模式（NUMERIC[] + 精确扫描）；pgvector 扩展在本机不可用，索引与近邻计划均无法验证

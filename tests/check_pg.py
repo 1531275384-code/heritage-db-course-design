@@ -15,6 +15,7 @@
 运行
 ----
     python -m tests.check_pg                       # 默认连 127.0.0.1:55432/heritage
+    python -m tests.check_pg --require-hnsw        # 无 pgvector 时 HNSW 判 FAIL（交付验收用）
     PG_DSN="host=... dbname=..." python -m tests.check_pg
 
 前置：库已用 `python -m scripts.pg_run --reset` 建好。
@@ -31,6 +32,13 @@ from psycopg2 import errors
 
 DSN = os.environ.get(
     "PG_DSN", "host=127.0.0.1 port=55432 user=postgres dbname=heritage"
+)
+
+# 默认允许降级模式跑完整验收，把 HNSW 记为「缺口」；
+# 验收/交付场景要求「必须实测 HNSW」时，用 --require-hnsw（或 ICH_REQUIRE_HNSW=1）
+# 让缺少 pgvector 直接判 FAIL，而不是留一个可以被忽略的 GAP。
+REQUIRE_HNSW = ("--require-hnsw" in sys.argv) or (
+    os.environ.get("ICH_REQUIRE_HNSW", "").strip().lower() in {"1", "true", "yes", "on"}
 )
 
 RESULTS: list[tuple[str, str, str]] = []   # (状态, 名称, 说明)
@@ -390,16 +398,74 @@ def main() -> int:
     check(ok, "维度不一致时拒绝计算", msg)
 
     # ------------------------------------------------------------------ 10 HNSW
-    section("10 向量索引")
-    cur.execute("""SELECT indexname, indexdef FROM pg_indexes
-                   WHERE schemaname='public' AND tablename='public_motif'""")
-    idx = cur.fetchall()
+    section("10 向量索引（pgvector / HNSW）")
+
+    # 只查 public_motif 一张表、或只要发现「有任意一个 hnsw 索引」就放行，
+    # 都不足以证明向量近邻真的走了索引。这里逐项核对：
+    #   ① pgvector 扩展是否真的装了
+    #   ② 设计里点名的两个索引是否各自存在且确实是 hnsw
+    #   ③ 真的执行一次 <=> 近邻查询，看计划里是否出现该索引
+    # 小数据量下优化器可能偏好顺序扫描，因此额外在 enable_seqscan=off 下
+    # 验证「索引可被选中」；两种计划的取舍都如实打印，不拿强制设置冒充默认行为。
+    WANTED_IDX = {
+        "idx_public_motif_hnsw": ("public_motif", "base_vector", "motif_id"),
+        "idx_feature_vector_hnsw": ("feature_vector", "embedding", "fv_id"),
+    }
+
     if native:
-        has_hnsw = any("hnsw" in d.lower() for _, d in idx)
-        check(has_hnsw, "HNSW 索引已建立", "; ".join(n for n, _ in idx))
+        cur.execute("SELECT extversion FROM pg_extension WHERE extname='vector'")
+        row = cur.fetchone()
+        check(row is not None, "pgvector 扩展已安装", f"vector {row[0]}" if row else "pg_extension 中无 vector")
+
+        for idxname, (tab, col, pk) in WANTED_IDX.items():
+            cur.execute("""SELECT indexdef FROM pg_indexes
+                           WHERE schemaname='public' AND tablename=%s AND indexname=%s""",
+                        (tab, idxname))
+            r = cur.fetchone()
+            ddl = r[0] if r else ""
+            check(bool(ddl) and "hnsw" in ddl.lower() and col in ddl.lower(),
+                  f"{idxname} 存在且为 HNSW({col})",
+                  ddl.splitlines()[0][:100] if ddl else "未找到该索引")
+
+        # ③ 真实近邻查询：用表内一条真实向量做探针，避免自己编字面量
+        for idxname, (tab, col, pk) in WANTED_IDX.items():
+            cur.execute(f"SELECT count(*) FROM {tab}")
+            n_row = cur.fetchone()[0]
+            cur.execute(f"SELECT {col}::text FROM {tab} LIMIT 1")
+            probe = cur.fetchone()
+            if probe is None:
+                gap(f"{idxname} 近邻计划未实测",
+                    f"{tab} 当前 0 行，无真实向量可做探针；索引存在但未在数据上验证")
+                continue
+            sql = (f"SELECT {pk} FROM {tab} "
+                   f"ORDER BY {col} <=> %s::vector LIMIT 5")
+            # 默认设置下的计划：如实记录，作为「优化器真实选择」的观察值
+            cur.execute("SELECT 1")  # 确保处于事务内，SET LOCAL 才生效
+            cur.execute("SAVEPOINT knn")
+            cur.execute("EXPLAIN (COSTS OFF) " + sql, (probe[0],))
+            plan_default = " | ".join(x[0].strip() for x in cur.fetchall())
+            cur.execute("SET LOCAL enable_seqscan = off")
+            cur.execute("EXPLAIN (COSTS OFF) " + sql, (probe[0],))
+            plan_forced = " | ".join(x[0].strip() for x in cur.fetchall())
+            cur.execute("ROLLBACK TO SAVEPOINT knn")
+
+            used_default = idxname in plan_default.lower()
+            usable = idxname in plan_forced.lower()
+            check(usable, f"{idxname} 可被近邻查询选中（enable_seqscan=off 验证）",
+                  f"{n_row} 行；默认计划={'命中索引' if used_default else '顺序扫描'}")
+            print(f"      默认计划：{plan_default[:150]}")
+            print(f"      强制索引：{plan_forced[:150]}")
     else:
-        gap("HNSW 索引未实测",
-            "当前为降级模式，无 pgvector；检索走精确扫描，性能结论不可得")
+        cur.execute("""SELECT count(*) FROM pg_available_extensions WHERE name='vector'""")
+        avail = cur.fetchone()[0]
+        detail = (f"当前为降级模式（NUMERIC[] + 精确扫描）；"
+                  f"pgvector 扩展{'已提供但未启用' if avail else '在本机不可用'}，"
+                  f"索引与近邻计划均无法验证")
+        if REQUIRE_HNSW:
+            # 验收要求「必须实测 HNSW」时，缺失就是失败，不能记成缺口糊过去
+            record("FAIL", "HNSW 索引未实测（--require-hnsw 要求实测）", detail)
+        else:
+            gap("HNSW 索引未实测", detail)
 
     # ------------------------------------------------------------------ 11 业务规则
     section("11 业务规则在数据库层的落实情况")
