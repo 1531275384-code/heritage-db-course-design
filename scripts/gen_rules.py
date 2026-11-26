@@ -610,6 +610,19 @@ SIGNATURES: dict[str, dict] = {
     ),
     "fn_motif_vector_normalize": dict(kind="derived", must=[r"NEW\.base_vector\s*:="]),
     "fn_asset_audit_trigger": dict(kind="audit", must=[r"INSERT\s+INTO\s+system_audit_log"]),
+    # 谱系 DAG 守卫：判据是「图结构」而不是单行取值 —— child 是否已是 parent 的祖先，
+    # 要靠递归遍历整张边表才能回答。对拍样本的模型是"一行数据 + 一次操作"，
+    # 表达不了"若干条边构成一条路径"，因此登记为 dag 类别，不参与接受/拒绝对拍；
+    # 它的行为由 tests/test_pg_concurrency 在真实库上按图场景逐条验证。
+    "fn_genealogy_no_cycle": dict(
+        kind="dag",
+        must=[
+            r"pg_advisory_xact_lock",
+            r"WITH\s+RECURSIVE\s+up",
+            r"NEW\.parent_asset_id",
+            r"RAISE\s+EXCEPTION",
+        ],
+    ),
 }
 
 

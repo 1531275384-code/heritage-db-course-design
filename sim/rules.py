@@ -6,10 +6,10 @@
 对账：python -m scripts.gen_rules --verify-db  （与运行中的库逐条比对）
 
 来源指纹（前 16 位）
-  sql/01_init.sql                f0cc7cfc4b52eee2
-  sql/02_index_trigger_view.sql  41855524999d8f88
+  sql/01_init.sql                e259c8d80a515091
+  sql/02_index_trigger_view.sql  ce5dfb97b28b2637
 
-规则计数：CHECK 24 / UNIQUE 4 / 外键 12 / 触发器 9
+规则计数：CHECK 24 / UNIQUE 4 / 外键 12 / 触发器 10
 
 为什么这里只有数据没有逻辑：逻辑在 sim/ruleast.py（手写）与 sim/verdict.py。
 生成文件被覆盖时不应丢失任何判定语义，否则说明有人把逻辑写进了生成器。
@@ -41,7 +41,7 @@ from sim.ruleast import (
 )
 
 SOURCE_FILES = ('sql/01_init.sql', 'sql/02_index_trigger_view.sql')
-SOURCE_SHA256 = {'sql/01_init.sql': 'f0cc7cfc4b52eee2', 'sql/02_index_trigger_view.sql': '41855524999d8f88'}
+SOURCE_SHA256 = {'sql/01_init.sql': 'e259c8d80a515091', 'sql/02_index_trigger_view.sql': 'ce5dfb97b28b2637'}
 
 # ==========================================================================
 #  枚举取值域（由 CREATE TYPE ... AS ENUM 决定）
@@ -493,6 +493,9 @@ TRIGGERS: tuple[TriggerRule, ...] = (
     TriggerRule("public_motif", "trg_motif_vector_norm", "BEFORE",
         ("INSERT", "UPDATE",), "fn_motif_vector_normalize", "derived",
     ),
+    TriggerRule("asset_genealogy", "trg_genealogy_no_cycle", "BEFORE",
+        ("INSERT", "UPDATE",), "fn_genealogy_no_cycle", "dag",
+    ),
 )
 
 CONSTRAINT_NAMES: frozenset[str] = frozenset({
@@ -537,6 +540,7 @@ CONSTRAINT_NAMES: frozenset[str] = frozenset({
     "trg_asset_touch",
     "trg_audit_record_guard",
     "trg_audit_record_no_delete",
+    "trg_genealogy_no_cycle",
     "trg_license_no_delete",
     "trg_license_require_approved",
     "trg_motif_vector_norm",

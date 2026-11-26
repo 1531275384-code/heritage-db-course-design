@@ -350,12 +350,15 @@ class TriggerRule:
         actor_gate  依据数据库角色拒绝本次修改（同一行数据，换个角色结论就不同）
         derived     只改写 NEW 的派生列，不拒绝
         audit       只写审计日志，不拒绝
+        dag         依据整张图的结构拒绝（如衍生谱系成环），需要遍历多行才能判定
 
     只有 reject / gate / guard 三类会产生「数据可判定的拒绝」，参与接受与否的比对。
     actor_gate 的判定输入里有一个身份（会话角色），样本只描述数据不描述身份，
     硬塞进同一套对拍会得到「同样的数据有时接受有时拒绝」的假冲突 —— 它由
     tests/check_pg 用真实 SET LOCAL ROLE 逐条验证，不在此处求值。
     derived / audit 不参与比对，但必须被显式分类，否则说明新触发器没人审过。
+    dag 同理：判定需要一张图，而样本是单行，硬套只会得到假结论；
+    它由 tests/test_pg_concurrency 用真实边集验证。
     """
 
     table: str

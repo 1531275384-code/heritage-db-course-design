@@ -129,14 +129,28 @@ def main() -> int:
     n_tab = cur.fetchone()[0]
     check(n_tab == 8, "8 张业务表存在", f"实际 {n_tab}")
 
-    cur.execute("""SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    # 用「按名字核对」而不是「按个数核对」：个数对得上但换了个视图的情况，
+    # 恰恰是漏检最严重的一种（数量没变，功能没了）。
+    cur.execute("""SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                    WHERE n.nspname='public' AND c.relkind='v'""")
-    n_view = cur.fetchone()[0]
-    check(n_view == 3, "3 个视图存在", f"实际 {n_view}")
+    views = {r[0] for r in cur.fetchall()}
+    want_views = {"v_asset_pending_audit", "v_asset_trace_chain",
+                  "v_asset_ledger", "v_asset_lineage"}
+    miss_view = want_views - views
+    check(not miss_view, "4 个视图齐备",
+          f"缺失 {sorted(miss_view)}" if miss_view else f"{len(views)} 个：{sorted(views)}")
 
-    cur.execute("SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal")
-    n_trg = cur.fetchone()[0]
-    check(n_trg == 9, "9 个触发器存在", f"实际 {n_trg}")
+    cur.execute("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")
+    trgs = {r[0] for r in cur.fetchall()}
+    want_trg = {
+        "trg_asset_right_change", "trg_asset_touch", "trg_audit_record_no_delete",
+        "trg_audit_record_guard", "trg_syslog_immutable", "trg_license_no_delete",
+        "trg_license_require_approved", "trg_asset_status_guard",
+        "trg_motif_vector_norm", "trg_genealogy_no_cycle",
+    }
+    miss_trg = want_trg - trgs
+    check(not miss_trg, "10 个触发器齐备",
+          f"缺失 {sorted(miss_trg)}" if miss_trg else f"{len(trgs)} 个")
 
     cur.execute("SELECT count(*) FROM pg_roles WHERE rolname LIKE 'ich\\_%'")
     n_role = cur.fetchone()[0]

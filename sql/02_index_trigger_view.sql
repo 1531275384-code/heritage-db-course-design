@@ -523,6 +523,81 @@ CREATE TRIGGER trg_motif_vector_norm
 -- （asset 侧向量由 Python 侧归一化后写入，避免每行向量运算开销）
 
 
+-- -----------------------------------------------------------------------------
+--  B5. 衍生谱系必须是有向无环图（BEFORE INSERT OR UPDATE ON asset_genealogy） ★核心★
+--
+--  为什么不能只靠应用层：`ck_gen_not_self` 只拦住"自己指向自己"这一跳，
+--  A→B、B→C 之后再插 C→A 依然能写进去，图谱从此成环。
+--  一旦成环，任何递归追溯（B5 之后的 v_asset_lineage）都会无限展开，
+--  且"谁改编自谁"的语义彻底失效 —— 这是数据完整性约束，必须落在数据库层。
+--
+--  判据（把边方向想清楚）：
+--    新边 parent → child 会成环  ⟺  child 已经是 parent 的祖先。
+--    证明：若 child 是 parent 的祖先，则存在路径 child ⇒…⇒ parent，
+--    再加上新边 parent → child，闭环成立；反之若闭环成立，去掉新边后
+--    必有一条 child ⇒…⇒ parent 的路径，即 child 是 parent 的祖先。
+--  于是检测只需"从 parent 向上找祖先，看能否走到 child"。
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_genealogy_no_cycle()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_parent BIGINT := NEW.parent_asset_id;
+    v_child  BIGINT := NEW.child_asset_id;
+    v_hit    BOOLEAN;
+    v_path   BIGINT[];
+BEGIN
+    -- 自环由 ck_gen_not_self 负责，这里不重复报错（保留各自的单一职责）
+    IF v_parent = v_child THEN
+        RETURN NEW;
+    END IF;
+
+    -- 【并发写偏斜】两个会话同时插 A→B 与 B→A 时，各自都看不到对方**未提交**的边，
+    -- 逐行检查会双双通过，提交后图谱成环。行锁在这里没用（两行互不相干），
+    -- 因此取一把事务级咨询锁，把所有谱系写入串成一条队；锁在 COMMIT/ROLLBACK 时自动释放。
+    PERFORM pg_advisory_xact_lock(hashtext('ich.asset_genealogy.dag'));
+
+    WITH RECURSIVE up AS (
+        -- 起点：parent 的直接父节点（UPDATE 时排除自身，否则会把自己当成祖先）
+        SELECT g.parent_asset_id AS asset_id,
+               ARRAY[g.parent_asset_id] AS path
+          FROM asset_genealogy g
+         WHERE g.child_asset_id = v_parent
+           AND g.genealogy_id <> COALESCE(NEW.genealogy_id, -1)
+        UNION ALL
+        -- 递归：继续向上走。`NOT (... = ANY(path))` 是对"历史脏数据已含环"的兜底，
+        -- 保证这条查询永远不会无限展开（正常情况下环已被本触发器挡在门外）
+        SELECT g.parent_asset_id,
+               up.path || g.parent_asset_id
+          FROM up
+          JOIN asset_genealogy g ON g.child_asset_id = up.asset_id
+         WHERE g.genealogy_id <> COALESCE(NEW.genealogy_id, -1)
+           AND NOT (g.parent_asset_id = ANY (up.path))
+    )
+    SELECT EXISTS (SELECT 1 FROM up WHERE asset_id = v_child),
+           (SELECT path FROM up WHERE asset_id = v_child
+             ORDER BY cardinality(path) LIMIT 1)
+      INTO v_hit, v_path;
+
+    IF v_hit THEN
+        RAISE EXCEPTION '衍生谱系成环：资产 % 已是资产 % 的祖先，不能再建立 % → % 的衍生边',
+                v_child, v_parent, v_parent, v_child
+            USING ERRCODE = '23514',
+                  HINT = '闭环路径：' || array_to_string(ARRAY[v_parent] || v_path, ' → ')
+                      || '。谱系必须是有向无环图，请检查边方向是否建反';
+    END IF;
+
+    RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_genealogy_no_cycle ON asset_genealogy;
+CREATE TRIGGER trg_genealogy_no_cycle
+    BEFORE INSERT OR UPDATE ON asset_genealogy
+    FOR EACH ROW EXECUTE FUNCTION fn_genealogy_no_cycle();
+
+COMMENT ON TRIGGER trg_genealogy_no_cycle ON asset_genealogy IS
+'衍生谱系 DAG 守卫：多跳成环直接拒绝，并用事务级咨询锁消除并发写偏斜';
+
+
 -- =============================================================================
 --  C. 视图（对应用层屏蔽多表连接细节，同时限定可见列 —— 逻辑数据独立性）
 --  【数据库原理】视图是"存储的查询"，本身不存数据；这里用普通视图(非物化)，
@@ -747,6 +822,68 @@ LEFT JOIN LATERAL (
 COMMENT ON VIEW v_asset_ledger IS '监管台账：一资产一行，汇总权属结论、AI 吻合度、授权规模与审计痕迹';
 
 
+DROP VIEW IF EXISTS v_asset_lineage;
+-- -----------------------------------------------------------------------------
+--  C4. v_asset_lineage 祖先链（递归 CTE，任意深度）
+--
+--  与 C2 的区别：
+--    v_asset_trace_chain 是**时间维度**的事件流（登记/审核/授权/审计），平铺一层；
+--    v_asset_lineage     是**图维度**的血缘链（我改编自谁、再往上是谁），需要递归。
+--
+--  一行 = (asset, ancestor) 一条祖先关系，depth=1 为直接父节点。
+--  path 从自身到该祖先，便于展示"链"而不是散点；同一祖先经不同路径可达时
+--  （菱形 DAG：A→B→D、A→C→D）会出现多行，这是正确的 —— 血缘有多条来路。
+--
+--  递归终止条件两条：
+--    1) 走到没有父节点的根；
+--    2) `NOT (... = ANY(path))`：即便历史上混进了环，也不会无限展开。
+--       （新写入已由 trg_genealogy_no_cycle 拦住，这里是读取侧的兜底）
+-- -----------------------------------------------------------------------------
+CREATE VIEW v_asset_lineage AS
+WITH RECURSIVE up AS (
+    -- 基础项：直接父子边
+    SELECT g.child_asset_id   AS asset_id,
+           g.parent_asset_id  AS ancestor_id,
+           1                  AS depth,
+           ARRAY[g.child_asset_id, g.parent_asset_id] AS path,
+           g.relation_type,
+           g.similarity
+      FROM asset_genealogy g
+    UNION ALL
+    -- 递归项：沿 parent 继续向上
+    SELECT up.asset_id,
+           g.parent_asset_id,
+           up.depth + 1,
+           up.path || g.parent_asset_id,
+           g.relation_type,
+           g.similarity
+      FROM up
+      JOIN asset_genealogy g ON g.child_asset_id = up.ancestor_id
+     WHERE NOT (g.parent_asset_id = ANY (up.path))
+       AND up.depth < 64                     -- 防御性上限，正常谱系远达不到
+)
+SELECT
+    up.asset_id,
+    a.title                                        AS asset_title,
+    up.ancestor_id,
+    anc.title                                      AS ancestor_title,
+    anc.right_level                                AS ancestor_level,
+    owner.display_name                             AS ancestor_owner,
+    up.depth,
+    (up.depth = 1)                                 AS is_direct_parent,
+    up.relation_type,
+    up.similarity,
+    up.path
+FROM up
+JOIN asset    a     ON a.asset_id   = up.asset_id
+JOIN asset    anc   ON anc.asset_id = up.ancestor_id
+LEFT JOIN app_user owner ON owner.user_id = anc.owner_id;
+
+COMMENT ON VIEW v_asset_lineage IS
+'祖先链：递归 CTE 展开任意深度的衍生血缘，depth=1 为直接父节点，path 为自身→祖先的完整路径';
+
+
+
 -- =============================================================================
 --  D. 角色与权限（数据库层 GRANT）  ★对应"权限管控"要求★
 --  【数据库原理】最小权限原则：
@@ -790,7 +927,7 @@ GRANT SELECT, INSERT ON feature_vector TO ich_heritor;
 -- 不会改变权属或审核结论；要按人隔离需 RLS + 每用户会话变量，超出本设计范围。
 GRANT DELETE ON feature_vector TO ich_heritor;
 GRANT SELECT, INSERT ON audit_record TO ich_heritor;                -- 可提交审核申请
-GRANT SELECT ON v_asset_pending_audit, v_asset_trace_chain, v_asset_ledger TO ich_heritor;
+GRANT SELECT ON v_asset_pending_audit, v_asset_trace_chain, v_asset_ledger, v_asset_lineage TO ich_heritor;
 -- 权利人本人可登记授权。只给 INSERT 不给 UPDATE/DELETE：
 -- 授权是追加式的，撤销 = 新增一条 revoked 记录，历史不可改不可删。
 -- ⚠️ 这一行曾经漏掉（只有 SELECT），后果是「登记授权」在真实库上必然 42501 ——
@@ -803,7 +940,7 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ich_heritor;
 GRANT SELECT ON app_user, public_motif, asset, feature_vector, license_record, asset_genealogy TO ich_expert;
 GRANT SELECT, INSERT, UPDATE ON audit_record TO ich_expert;
 GRANT UPDATE (audit_status, right_level, motif_id) ON asset TO ich_expert;  -- ★ 终审改权属
-GRANT SELECT ON v_asset_pending_audit, v_asset_trace_chain, v_asset_ledger, system_audit_log TO ich_expert;
+GRANT SELECT ON v_asset_pending_audit, v_asset_trace_chain, v_asset_ledger, v_asset_lineage, system_audit_log TO ich_expert;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ich_expert;
 
 -- ---------- 监管管理员：全量只读 + 母题库维护 + 授权代登记 ----------
@@ -812,6 +949,9 @@ GRANT INSERT, UPDATE, DELETE ON public_motif TO ich_admin;
 -- 监管代登记：传承人不便操作时由监管方代为录入授权（仍受 trg_license_require_approved
 -- 与 ck_lic_self 约束，代登记不能绕过"已终审"和"不能授权给自己"）
 GRANT INSERT ON license_record TO ich_admin;
+-- 注意：上面的 ALL TABLES **不含视图**（PostgreSQL 的 GRANT ... ON ALL TABLES 只覆盖
+-- 基表与分区表，视图要单独授权）。监管方要"看全量"，四个视图必须显式列出。
+GRANT SELECT ON v_asset_pending_audit, v_asset_trace_chain, v_asset_ledger, v_asset_lineage TO ich_admin;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ich_admin;
 
 -- ---------- 通用限制：审计日志与审核流水任何人都不能改 ----------

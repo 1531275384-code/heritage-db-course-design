@@ -241,7 +241,8 @@ def main() -> int:
     print("关键对象完整性")
     expected_tables = {"app_user", "public_motif", "asset", "feature_vector",
                        "audit_record", "license_record", "asset_genealogy", "system_audit_log"}
-    expected_views = {"v_asset_pending_audit", "v_asset_trace_chain", "v_asset_ledger"}
+    expected_views = {"v_asset_pending_audit", "v_asset_trace_chain", "v_asset_ledger",
+                      "v_asset_lineage"}
     expected_roles = {"ich_heritor", "ich_expert", "ich_admin"}
 
     def chk(label: str, expect: set[str], actual: set[str]) -> None:
@@ -303,8 +304,15 @@ def main() -> int:
     ):
         vname, body = m.group(1), m.group(2)
         body_wo_comments = re.sub(r"--[^\n]*", "", body)
+        # 递归视图里的 CTE 名（WITH RECURSIVE up AS ...）不是表，
+        # 但会被 FROM/JOIN 正则抓出来。不排除掉就会把 v_asset_lineage 误报为
+        # "引用了未定义对象 up" —— 校验器自身的坑，和上面 view_boundary 同类。
+        ctes = {
+            c.lower()
+            for c in re.findall(r"(?:with\s+(?:recursive\s+)?|,\s*)([a-z_]\w*)\s+as\s*\(", body, re.I)
+        }
         refs = set(re.findall(r"(?:from|join)\s+([a-z_][\w.]*)", body_wo_comments, re.I))
-        refs = {r.split(".")[-1].lower() for r in refs} - {"lateral", "select"}
+        refs = {r.split(".")[-1].lower() for r in refs} - {"lateral", "select"} - ctes
         unknown = refs - all_objs["table"] - all_objs["view"]
         if unknown:
             failures += 1
@@ -332,6 +340,7 @@ def main() -> int:
         ("传承人对 audit_status 有写权限（故需闸门）",
          r"grant\s+update\s*\([^)]*audit_status[^)]*\)\s*\n?\s*on\s+asset\s+to\s+ich_heritor"),
         ("审核状态角色闸门", r"before\s+insert\s+or\s+update\s+on\s+asset\s+for\s+each\s+row\s+execute\s+function\s+fn_asset_status_guard"),
+        ("谱系 DAG 环检测触发器", r"before\s+insert\s+or\s+update\s+on\s+asset_genealogy\s+for\s+each\s+row\s+execute\s+function\s+fn_genealogy_no_cycle"),
     ]
     for label, pat in checks:
         if re.search(pat, view_sql, re.I | re.S):
@@ -346,7 +355,7 @@ def main() -> int:
         return 1
     print(f"{GREEN}全部校验通过{RESET}")
     print("提醒：这是静态结构检查，不能替代真实 PG 执行。")
-    print("      真库侧已由 python -m tests.check_pg 覆盖（46 项，含 1 项如实记录的缺口；需库已启动）；")
+    print("      真库侧已由 python -m tests.check_pg 覆盖（50 项，需库已启动）；")
     print("      重建便携库：python -m scripts.pg_run --reset")
     return 0
 

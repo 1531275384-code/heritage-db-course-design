@@ -115,7 +115,7 @@ check("所有规则引用的表/列都在 COLUMNS 中", not bad_refs, "; ".join(
 # =============================================================================
 section("[3] 触发器必须被显式分类（新增触发器不许静默溜进来）")
 
-KINDS = {"reject", "gate", "guard", "actor_gate", "derived", "audit"}
+KINDS = {"reject", "gate", "guard", "actor_gate", "derived", "audit", "dag"}
 bad_kind = [t.name for t in R.TRIGGERS if t.kind not in KINDS]
 check("触发器类别都在已知集合内", not bad_kind, f"未知 {bad_kind}")
 
@@ -133,6 +133,11 @@ check(
     "审计日志表禁止改删",
     any(t.table == "system_audit_log" and t.kind == "reject"
         and {"UPDATE", "DELETE"} <= set(t.events) for t in R.TRIGGERS),
+)
+check(
+    "衍生谱系有 DAG 环检测触发器",
+    any(t.table == "asset_genealogy" and t.kind == "dag" for t in R.TRIGGERS),
+    "; ".join(t.name for t in R.TRIGGERS if t.table == "asset_genealogy"),
 )
 
 # 角色闸门：它的判定输入里有一个「会话角色」，不是纯数据规则，所以登记为

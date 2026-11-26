@@ -36,7 +36,7 @@ ROOT = Path(__file__).resolve().parent.parent
 GROUPS: dict[str, list[tuple[str, str, int | None]]] = {
     "pure": [
         ("tests.test_sql_structure",  "SQL 静态结构",        None),
-        ("tests.test_rules_sync",     "规则单一真相",        65),
+        ("tests.test_rules_sync",     "规则单一真相",        66),
         ("tests.test_compat_vector",  "向量兼容层",          39),
         ("tests.test_invariants",     "源码级不变量",        88),
         ("tests.test_classifier",     "三档分级器",          24),
@@ -50,7 +50,8 @@ GROUPS: dict[str, list[tuple[str, str, int | None]]] = {
         ("tests.check_demo_v2",       "互动版演示页验收",    58),
     ],
     "db": [
-        ("tests.check_pg",            "真实 PostgreSQL 验收", 46),
+        ("tests.check_pg",            "真实 PostgreSQL 验收", 50),
+        ("tests.test_pg_concurrency", "多会话并发验收",       30),
         ("tests.test_rules_parity",   "规则对拍（库 vs Python）", 79),
     ],
 }

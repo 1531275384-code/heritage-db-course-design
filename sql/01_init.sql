@@ -289,7 +289,7 @@ CREATE TABLE asset_genealogy (
     CONSTRAINT ck_gen_sim CHECK (similarity IS NULL OR (similarity >= 0 AND similarity <= 1)),
     CONSTRAINT uq_gen_edge UNIQUE (parent_asset_id, child_asset_id)
 );
-COMMENT ON TABLE asset_genealogy IS '衍生谱系边表：parent 改编为 child，构成 DAG(由应用层做环检测)';
+COMMENT ON TABLE asset_genealogy IS '衍生谱系边表：parent 改编为 child，构成 DAG（多跳成环由 trg_genealogy_no_cycle 拒绝）';
 
 
 -- =============================================================================

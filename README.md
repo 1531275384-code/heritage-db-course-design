@@ -325,7 +325,7 @@ psql -U postgres -d ich_heritage -v ON_ERROR_STOP=1 -f sql/03_seed.sql
 | 脚本 | 内容 | 对象数 |
 |---|---|---|
 | `sql/01_init.sql` | 扩展、3 个枚举类型、8 张表（含全部 CHECK/UNIQUE/外键/注释） | 35 条语句 |
-| `sql/02_index_trigger_view.sql` | 14 个索引、8 个触发器函数、9 个触发器、3 个视图、3 个角色与 GRANT | 73 条语句 |
+| `sql/02_index_trigger_view.sql` | 14 个索引、10 个函数、10 个触发器、4 个视图、3 个角色与 GRANT | 89 条语句 |
 | `sql/03_seed.sql` | 3 个用户、3 条公有母题（占位向量） | 4 条语句 |
 
 > **脚本可重复执行吗？** `01` 用 `DROP TABLE ... CASCADE` + `DO $$ ... EXCEPTION WHEN duplicate_object`，可以重复跑（会清空数据）。`02` 用 `CREATE OR REPLACE` / `IF NOT EXISTS` / `DROP TRIGGER IF EXISTS`，也可以重复跑。`03` 用 `ON CONFLICT DO NOTHING`，重复跑不会产生重复数据。
@@ -738,8 +738,8 @@ UPDATE asset SET right_level = 'original' WHERE asset_id = 1;
 └── tests/
     ├── run_all.py                  # ★ 测试总入口：三个分组，一条命令跑完并汇总
     ├── test_sql_structure.py       # SQL 静态结构校验（无库也能跑）
-    ├── test_rules_sync.py          # ★ 59 项规则单一真相：漂移检测 / 覆盖完整性 / 求值语义
-    ├── test_rules_parity.py        # ★ 75 项规则对拍：同一组边界样本喂真实库与 Python，比判定
+    ├── test_rules_sync.py          # ★ 66 项规则单一真相：漂移检测 / 覆盖完整性 / 求值语义
+    ├── test_rules_parity.py        # ★ 79 项规则对拍：同一组边界样本喂真实库与 Python，比判定
     ├── test_compat_vector.py       # ★ 39 项兼容层验证（cosine 公式、归一化、脚本结构）
     ├── test_invariants.py          # ★ 88 项源码级不变量审查
     ├── test_classifier.py          # 24 项分级器测试
@@ -749,7 +749,8 @@ UPDATE asset SET right_level = 'original' WHERE asset_id = 1;
     ├── shoot_ui.py                 # ★ 49 项三角色逐页 UI 断言 + 截图
     ├── check_demo_page.py          # ★ 52 项纯界面演示页验收（file:// 直开，含断网测试）
     ├── check_demo_v2.py            # ★ 58 项互动版验收（拖动登录、终审、阈值联动）
-    ├── check_pg.py                 # ★ 46 项真实 PostgreSQL 验收（45 通过 / 1 缺口）
+    ├── check_pg.py                 # ★ 50 项真实 PostgreSQL 验收（50 通过 / 0 缺口）
+    ├── test_pg_concurrency.py      # ★ 30 项多会话并发验收（临时库：并发终审/独占授权/成环）
     └── tune_weights.py             # 特征段权重标定脚本（可复现）
 ```
 
@@ -868,7 +869,7 @@ CREATE TRIGGER trg_syslog_immutable
 | **3NF** | 每个非主属性完全依赖于主键，消除传递依赖。例如 `asset` 只存 `owner_id`，不冗余存 `owner_name`、`owner_org` | `01_init.sql` |
 | **1:1 垂直拆分** | `feature_vector` 从 `asset` 拆出。512 维向量占 2 KB/行，与主表放一起会严重拖慢 `asset` 全表扫描与缓存命中 | `01_init.sql` `[4]` |
 | **枚举类型收敛值域** | `right_level_enum` / `audit_status_enum` / `user_role_enum`，比 `VARCHAR` 省空间且强约束 | `01_init.sql` |
-| **自引用外键构成 DAG** | `asset_genealogy` 的 `parent_asset_id` / `child_asset_id` 各自指向 `asset`，配合 `CHECK (parent <> child)` 阻止自环；`UNIQUE(parent, child)` 阻止重复边 | `01_init.sql` `[7]` |
+| **自引用外键构成 DAG** | `asset_genealogy` 的 `parent_asset_id` / `child_asset_id` 各自指向 `asset`；`CHECK (parent <> child)` 阻止自环，`UNIQUE(parent, child)` 阻止重复边；**多跳成环由触发器 `trg_genealogy_no_cycle` 用递归 CTE 拒绝**（判据：child 已是 parent 的祖先），并用事务级咨询锁消除「两会话同时反向建边」的写偏斜 | `01_init.sql` `[7]` / `02` `B5` |
 | **链式自引用** | `license_record.prev_license_id → license_record.license_id`，把授权串成流转链 | `01_init.sql` `[6]` |
 | **ON DELETE RESTRICT 保护证据链** | 几乎所有外键都用 `RESTRICT` 而非 `CASCADE`：有资产关联的用户不能物理删除，否则溯源链断掉。**唯一例外**是 `feature_vector → asset` 用 `CASCADE`（向量是派生数据，随资产走） | `01_init.sql` |
 | **CHECK 表达业务不变量** | `ck_audit_decided`：已决策必须同时有专家、决策时间、终审结论；未决策则三者皆空。`ck_asset_ai_pair`：AI 建议级别与置信度必须同生同灭 | `01_init.sql` |
@@ -927,6 +928,7 @@ CREATE TRIGGER trg_syslog_immutable
 | `v_asset_pending_audit` | 专家工作台数据源 | `LEFT JOIN LATERAL` 为每行取最新一条待审记录；从 `similarity_json` JSONB 里抽 top1 母题 |
 | `v_asset_trace_chain` | 溯源链路 | 4 段 `UNION ALL` 把子查询结果（表）拼起来，统一成 `(asset_id, seq_no, event_at, event_type, summary, actor, detail)` 的事件流模型 |
 | `v_asset_ledger` | 监管台账 | 一资产一行；`LEFT JOIN LATERAL` 做授权聚合（`count` / `count FILTER (WHERE status='active')` / `sum FILTER`），**避免多表 JOIN 产生笛卡尔积放大** |
+| `v_asset_lineage` | 祖先链（衍生血缘） | `WITH RECURSIVE` 沿 `asset_genealogy` 向上展开到任意深度；`depth=1` 为直接父节点，`path` 保留完整链路。菱形 DAG 下同一祖先经不同路径可达会出现多行 —— 血缘本就多来路。递归带 `NOT (… = ANY(path))` 兜底，即使历史数据混进环也不会无限展开 |
 
 **为什么用普通视图而非物化视图？** 溯源链路必须查到实时一致数据 —— 刚完成的终审，打开溯源页就得看到。物化视图需要 `REFRESH`，在审计场景下是不可接受的语义偏差。代价是每次执行查询计划，但对监管方这种低频查询完全可接受。
 
@@ -947,7 +949,7 @@ CREATE TRIGGER trg_syslog_immutable
 
 | 角色 | SELECT | INSERT | UPDATE | 特殊限制 |
 |---|---|---|---|---|
-| `ich_heritor` 传承人 | `public_motif`、`app_user`（部分列）、`asset`、`feature_vector`、`audit_record`、`license_record`、3 个视图 | `asset`、`feature_vector`、`audit_record` | **`asset` 仅 11 个非权属列** ★ 不含 `right_level` | 看不到别人的资产（应用层 `owner_id` 过滤 + 视图过滤） |
+| `ich_heritor` 传承人 | `public_motif`、`app_user`（部分列）、`asset`、`feature_vector`、`audit_record`、`license_record`、4 个视图 | `asset`、`feature_vector`、`audit_record` | **`asset` 仅 11 个非权属列** ★ 不含 `right_level` | 看不到别人的资产（应用层 `owner_id` 过滤 + 视图过滤） |
 | `ich_expert` 专家 | 全部业务表 + 视图 + `system_audit_log` | `audit_record` | `audit_record`；`asset` 仅 `(audit_status, right_level, motif_id)` | 无 `public_motif` 写权限（母题库归监管方） |
 | `ich_admin` 监管 | 全表全视图 | `public_motif` | `public_motif` | `asset.right_level` **无写权限**（监管方只读，防止裁判兼运动员） |
 | 全体 | — | — | — | `system_audit_log` 的 `UPDATE`/`DELETE`/`TRUNCATE` 被 `REVOKE`；`audit_record` 的 `UPDATE`/`DELETE` 对 heritor/admin 被 `REVOKE` |
@@ -1104,15 +1106,15 @@ export ICH_SIM_DERIVED=0.82
 ### 一条命令跑完（推荐）
 
 ```bash
-python tests/run_all.py                # 纯代码 + 浏览器，433 项，约 73 秒
-python tests/run_all.py --group pure   # 只跑不用浏览器的，274 项，约 10 秒
-python tests/run_all.py --group db     # 真库验收 46 项（45 通过 / 1 缺口，需库已启动）
-python tests/run_all.py --all          # 三组全跑：13 套 / 568 项 / 1 缺口
+python tests/run_all.py                # 纯代码 + 浏览器，445 项，约 65 秒
+python tests/run_all.py --group pure   # 只跑不用浏览器的，286 项，约 10 秒
+python tests/run_all.py --group db     # 真库验收 159 项（check_pg 50 + 并发 30 + 对拍 79）
+python tests/run_all.py --all          # 三组全跑：14 套 / 604 项 / 0 缺口
 python tests/run_all.py -v             # 附加每套的完整输出
 ```
 
 汇总表会逐套报「通过 / 失败 / 缺口」，失败时自动打出该套件尾部。
-**缺口不会被算成通过**——`check_pg` 那 1 项 GAP（HNSW 未实测）会单独标出来。
+**缺口不会被算成通过**——`check_pg` 的 GAP 会单独标出来；本轮为 0（HNSW 已在原生 pgvector 上实测）。
 
 ### 逐套命令
 
@@ -1127,13 +1129,14 @@ python -m tests.run_e2e_inline         # 52 项端到端（进程内起服务，
 python -m tests.shoot_ui               # 49 项 UI 断言（三角色逐页渲染 + 截图，需 Playwright）
 python -m tests.check_demo_page        # 52 项纯界面演示页验收（file:// 直开，含断网与重置）
 python -m tests.check_demo_v2          # 58 项互动版验收（拖动登录、终审、阈值联动）
-python -m tests.check_pg               # 46 项真实 PostgreSQL 验收（45 通过 / 1 缺口）
+python -m tests.check_pg               # 50 项真实 PostgreSQL 验收（50 通过 / 0 缺口）
+python -m tests.test_pg_concurrency    # 30 项多会话并发验收（克隆临时库，跑完即删）
 ```
 
 | 套件 | 项数 | 干什么 |
 |---|---|---|
-| `test_sql_structure.py` | 全部通过 | 正确切分 `$$` 函数体 / 字符串 / 注释 / psql 元命令，校验 8 表 3 视图 3 角色齐全、外键目标存在、触发器函数存在、视图依赖表存在、12 项关键约束/索引存在、传承人列级授权不含 `right_level`、传承人对 `audit_status` 有写权限（故必须有角色闸门） |
-| `test_rules_sync.py` | **65** | 规则单一真相：`sim/rules.py` 与 SQL 漂移检测（含来源指纹）、24 条 CHECK/4 唯一/12 外键/9 触发器全覆盖且无凭空出现的约束、触发器必须被显式分类（含 `actor_gate`：角色闸门的受管角色/终态/事务标记必须被抽全）、三值逻辑（UNKNOWN≠失败）、成对约束与边界值、三类触发器判定（拒绝/门禁/守卫） |
+| `test_sql_structure.py` | 全部通过 | 正确切分 `$$` 函数体 / 字符串 / 注释 / psql 元命令，校验 8 表 4 视图 3 角色齐全、外键目标存在、触发器函数存在、视图依赖表存在（递归视图的 CTE 名不算表）、13 项关键约束/索引存在、传承人列级授权不含 `right_level`、传承人对 `audit_status` 有写权限（故必须有角色闸门） |
+| `test_rules_sync.py` | **66** | 规则单一真相：`sim/rules.py` 与 SQL 漂移检测（含来源指纹）、24 条 CHECK/4 唯一/12 外键/**10 触发器**全覆盖且无凭空出现的约束、触发器必须被显式分类（含 `actor_gate` 与 `dag`：角色闸门的受管角色/终态/事务标记必须被抽全；谱系环检测必须登记在案）、三值逻辑（UNKNOWN≠失败）、成对约束与边界值、三类触发器判定（拒绝/门禁/守卫） |
 | `test_compat_vector.py` | **39** | 验证降级模式的 `<=>` 与 pgvector 的 cosine 距离**数值一致**（含相同/相反/正交/零向量边界）、归一化后「内积 = 1-距离」这一检索正确性前提、`\if`/`\endif` 配对、无未受保护的 `::vector` 强转 |
 | `test_invariants.py` | **88** | AI 不写 `right_level`、终审单事务、GRANT 列级权限、追加式日志、触发器覆盖、结构完整性、API 鉴权、向量一致性、前端用户可控文本全部经 `esc()` 转义、演示模式与真实库返回列集合一致、**母题血缘被回写**、**溯源节点序号连续**、**种子 AI 字段必须是真实算法输出且相似度 ≠ 置信度**、**视图列与 Pydantic 模型同步** |
 | `test_classifier.py` | **24** | 三档判定、阈值等号语义、抄袭嫌疑、退化输入、置信度单调性、中文标签 |
@@ -1142,11 +1145,12 @@ python -m tests.check_pg               # 46 项真实 PostgreSQL 验收（45 通
 | `shoot_ui.py` | **49** | 进程内起 uvicorn + Playwright 驱动真实浏览器，三种角色逐个页签断言：无 `undefined`/`NaN`/`[object Object]`、console 零报错、关键数据行数与种子一致，并逐屏截图 |
 | `check_demo_page.py` | **52** | 单文件演示页验收：`file://` 协议直开，7 章节渲染、身份切换后页签随角色变化、越权页签不可见、母题筛选、作品详情含溯源与专家意见、AI 分析显示真实相似度、终审推翻 AI 的标记、台账授权费 ¥131,600、重置恢复初始状态、五页签逐页无异常文本、console 零报错 |
 | `check_demo_v2.py` | **58** | 互动版验收：拖动滑块验证（拖到一半不通过、拖到底才通过）、错误密码拦截、登录后角色可见性（传承人 6 个入口 / 专家 9 个）、筛选与多选批量、详情抽屉、终审 4 档位与未填意见拦截、推翻 AI 后审计日志留痕、上传分析含阈值推算、溯源图谱节点数、默认页下拉非空、关闭置信度后表格随之变化、阈值拖动联动、重置恢复 |
-| `check_pg.py` | **46**（45 通过 / 1 缺口） | 真实 PostgreSQL 验收：8 表 3 视图 3 角色齐全、9 个触发器、枚举取值域、CHECK/UNIQUE/外键、事务回滚、`FOR UPDATE` 行锁（第二会话 55P03）、降级向量层 cosine 语义、**未终审与已驳回不得授权**、**审计日志 actor 必须是业务角色而非函数属主**、**`license_record` 的 INSERT 权限配置正确**、**传承人直连库改 `approved` 被触发器拒绝（42501，且错误来自数据库而非应用层）**、**专家无终审标记改终态被拒 / 带标记放行 / 已终审不可回退**、**监管改状态被拒**。唯一缺口是 HNSW（便携包无 pgvector） |
+| `check_pg.py` | **50**（50 通过 / 0 缺口） | 真实 PostgreSQL 验收：8 表 4 视图 3 角色齐全、10 个触发器、枚举取值域、CHECK/UNIQUE/外键、事务回滚、`FOR UPDATE` 行锁（第二会话 55P03）、降级/原生向量层 cosine 语义、**未终审与已驳回不得授权**、**审计日志 actor 必须是业务角色而非函数属主**、**`license_record` 的 INSERT 权限配置正确**、**传承人直连库改 `approved` 被触发器拒绝（42501，且错误来自数据库而非应用层）**、**专家无终审标记改终态被拒 / 带标记放行 / 已终审不可回退**、**监管改状态被拒**、**两个 HNSW 索引逐一核对并用真实 `<=>` 近邻计划验证** |
+| `test_pg_concurrency.py` | **30** | 多会话并发验收（克隆一次性沙箱库，跑完 DROP）：**双专家同时终审同一资产恰好一个成功**、**外部持锁时终审确实阻塞在 `wait_event_type=Lock`**、**两份独占授权并发登记恰好一条生效**、**三跳/UPDATE 闭环被拒 + 菱形 DAG 允许**、**两会话反向建边恰好一条落库（咨询锁消除写偏斜）**、**递归祖先链深度 1/2/2/3、菱形多路径、根节点终止**、三档角色视图可读 |
 
 | `test_rules_parity.py` | **79** | 规则对拍：同一组边界样本分别喂真实数据库与 `sim/verdict`，比「接受/拒绝」是否一致。62 组规则样本（三档取值、四种授权类型、状态机非法跃迁、未终审即授权、自己授权给自己、NUMERIC 取整边界）判定 **100% 一致**；另 11 组权限边界（含传承人自封已确权、专家直改终态、专家带终审标记放行）、6 组唯一性与外键按设计分开核对；上一轮那 2 条「两侧都不拦」的已知缺口已被数据库闸门关闭，探针升级为断言，缺口位留空，`--self-check` 仍会故意让步以证明对拍真的会红 |
 
-合计 **568 项**（285 项纯代码与业务检查 + 49 项真实浏览器断言 + 52 项纯界面版验收 + 58 项互动版验收 + 45 项真库验收 + 79 项规则对拍），另有 1 项如实的缺口（HNSW 未实测），当前全部通过。规则对拍里的「已知缺口」一栏本轮清零：原先那 2 条自我定级路径已被 `trg_asset_status_guard` 关闭，探针升级成了断言。
+合计 **604 项**（286 项纯代码与业务检查 + 159 项浏览器与演示页断言 + 159 项真库/并发/对拍），**0 缺口**，当前全部通过。两处曾经"只写在注释里"的说法已变成可复现证据：HNSW 在原生 pgvector 上实测生效（5000 行时 0.76 ms vs 顺序扫描 22.31 ms），并发终审与独占授权由多会话测试证明"恰好一个成功"。
 
 交付物都是脚本生成的，改了数据或代码后按需重跑：
 
@@ -1313,7 +1317,7 @@ python -m app.cli demo-check
 | JWT 密钥 | 有开发默认值 | 必须用环境变量注入随机值 |
 | CORS | `allow_origins=["*"]` | 限定 Origin 白名单 |
 | 令牌存储 | `localStorage` | 有 XSS 风险；正式产品建议 `HttpOnly` cookie + CSRF token |
-| 谱系环检测 | 应用层未做 | 加递归 CTE 环检测 |
+| 谱系环检测 | 数据库触发器 `trg_genealogy_no_cycle` 拒绝多跳成环，递归视图 `v_asset_lineage` 可查任意深度祖先链 | 谱系**写入入口**尚未开放（当前没有 API 能登记衍生关系，只能由运维/种子写入）—— 开放时需同时决定"谁能给哪个资产建边"，避免越权伪造血缘 |
 | 审计日志 | 只增不归档 | 按时间分区 + 冷数据归档 |
 | 限流 | 无 | 上传与登录接口需限流 |
 
