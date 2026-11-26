@@ -1100,7 +1100,7 @@ export ICH_SIM_DERIVED=0.82
 
 ## 12. 测试与验证
 
-十二个套件，**十一个不需要数据库和网络**，`pip install -r requirements.txt` 后即可跑；
+十五个套件，**十一个不需要数据库和网络**，`pip install -r requirements.txt` 后即可跑；
 `check_pg` 需要真实 PostgreSQL（便携库用 `python -m scripts.pg_run --reset` 起）。
 
 ### 一条命令跑完（推荐）
@@ -1108,8 +1108,8 @@ export ICH_SIM_DERIVED=0.82
 ```bash
 python tests/run_all.py                # 纯代码 + 浏览器，445 项，约 65 秒
 python tests/run_all.py --group pure   # 只跑不用浏览器的，286 项，约 10 秒
-python tests/run_all.py --group db     # 真库验收 159 项（check_pg 50 + 并发 30 + 对拍 79）
-python tests/run_all.py --all          # 三组全跑：14 套 / 604 项 / 0 缺口
+python tests/run_all.py --group db     # 真库验收 196 项（check_pg 50 + 并发 30 + 对拍 79 + 备份恢复 37）
+python tests/run_all.py --all          # 三组全跑：15 套 / 641 项 / 0 缺口
 python tests/run_all.py -v             # 附加每套的完整输出
 ```
 
@@ -1131,6 +1131,7 @@ python -m tests.check_demo_page        # 52 项纯界面演示页验收（file:/
 python -m tests.check_demo_v2          # 58 项互动版验收（拖动登录、终审、阈值联动）
 python -m tests.check_pg               # 50 项真实 PostgreSQL 验收（50 通过 / 0 缺口）
 python -m tests.test_pg_concurrency    # 30 项多会话并发验收（克隆临时库，跑完即删）
+python -m tests.test_backup_restore    # 37 项备份恢复演练（真跑 pg_dump → 恢复临时库 → 逐对象比对）
 ```
 
 | 套件 | 项数 | 干什么 |
@@ -1148,9 +1149,10 @@ python -m tests.test_pg_concurrency    # 30 项多会话并发验收（克隆临
 | `check_pg.py` | **50**（50 通过 / 0 缺口） | 真实 PostgreSQL 验收：8 表 4 视图 3 角色齐全、10 个触发器、枚举取值域、CHECK/UNIQUE/外键、事务回滚、`FOR UPDATE` 行锁（第二会话 55P03）、降级/原生向量层 cosine 语义、**未终审与已驳回不得授权**、**审计日志 actor 必须是业务角色而非函数属主**、**`license_record` 的 INSERT 权限配置正确**、**传承人直连库改 `approved` 被触发器拒绝（42501，且错误来自数据库而非应用层）**、**专家无终审标记改终态被拒 / 带标记放行 / 已终审不可回退**、**监管改状态被拒**、**两个 HNSW 索引逐一核对并用真实 `<=>` 近邻计划验证** |
 | `test_pg_concurrency.py` | **30** | 多会话并发验收（克隆一次性沙箱库，跑完 DROP）：**双专家同时终审同一资产恰好一个成功**、**外部持锁时终审确实阻塞在 `wait_event_type=Lock`**、**两份独占授权并发登记恰好一条生效**、**三跳/UPDATE 闭环被拒 + 菱形 DAG 允许**、**两会话反向建边恰好一条落库（咨询锁消除写偏斜）**、**递归祖先链深度 1/2/2/3、菱形多路径、根节点终止**、三档角色视图可读 |
 
+| `test_backup_restore.py` | **37** | 备份恢复演练：真跑 `pg_dump -Fc`（记录体积/耗时/SHA-256）→ `pg_restore` 到临时库 → 逐对象比对 12 表/4 视图/26 索引/10 触发器/11 函数/3 枚举/8 序列/532 条列级授权/全表内容指纹 → 权限行为实测（heritor 可改 `title`、改 `right_level` 被 42501、改审计日志被 42501）→ 恢复库功能烟测（HNSW 近邻正确、终审正常提交三表同变）→ **注入异常后三表全回滚**（asset 版本号与微秒级时间戳都不变）→ 直连改终态仍被闸门拒绝 |
 | `test_rules_parity.py` | **79** | 规则对拍：同一组边界样本分别喂真实数据库与 `sim/verdict`，比「接受/拒绝」是否一致。62 组规则样本（三档取值、四种授权类型、状态机非法跃迁、未终审即授权、自己授权给自己、NUMERIC 取整边界）判定 **100% 一致**；另 11 组权限边界（含传承人自封已确权、专家直改终态、专家带终审标记放行）、6 组唯一性与外键按设计分开核对；上一轮那 2 条「两侧都不拦」的已知缺口已被数据库闸门关闭，探针升级为断言，缺口位留空，`--self-check` 仍会故意让步以证明对拍真的会红 |
 
-合计 **604 项**（286 项纯代码与业务检查 + 159 项浏览器与演示页断言 + 159 项真库/并发/对拍），**0 缺口**，当前全部通过。两处曾经"只写在注释里"的说法已变成可复现证据：HNSW 在原生 pgvector 上实测生效（5000 行时 0.76 ms vs 顺序扫描 22.31 ms），并发终审与独占授权由多会话测试证明"恰好一个成功"。
+合计 **641 项**（286 项纯代码与业务检查 + 159 项浏览器与演示页断言 + 196 项真库/并发/对拍/备份恢复），**0 缺口**，当前全部通过。两处曾经"只写在注释里"的说法已变成可复现证据：HNSW 在原生 pgvector 上实测生效（5000 行时 0.76 ms vs 顺序扫描 22.31 ms），并发终审与独占授权由多会话测试证明"恰好一个成功"；物理存储与 TOAST 已在 2 万行真实数据上实测（列表查询读 20 行：只取展示列 5 页 vs 连带向量 182 页，HNSW 3.05 ms vs 顺序扫描 209.74 ms）；备份恢复演练真跑过一遍 pg_dump/restore 并验证了终审事务的回滚彻底性。
 
 交付物都是脚本生成的，改了数据或代码后按需重跑：
 

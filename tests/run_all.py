@@ -53,6 +53,7 @@ GROUPS: dict[str, list[tuple[str, str, int | None]]] = {
         ("tests.check_pg",            "真实 PostgreSQL 验收", 50),
         ("tests.test_pg_concurrency", "多会话并发验收",       30),
         ("tests.test_rules_parity",   "规则对拍（库 vs Python）", 79),
+        ("tests.test_backup_restore", "备份恢复演练",         37),
     ],
 }
 

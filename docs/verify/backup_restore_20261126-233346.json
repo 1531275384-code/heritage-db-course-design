@@ -1,0 +1,351 @@
+{
+  "generated_at": "2026-11-26T23:33:35",
+  "source_db": "ich_heritage",
+  "sandbox_db": "ich_restore_21588_bd088b",
+  "pg_dump": "D:\\WorkBuddy\\2026-10-25-22-51-06_非遗数字资产确权溯源系统\\_env\\pgsql\\bin\\pg_dump.exe",
+  "pg_restore": "D:\\WorkBuddy\\2026-10-25-22-51-06_非遗数字资产确权溯源系统\\_env\\pgsql\\bin\\pg_restore.exe",
+  "dump": {
+    "bytes": 96404,
+    "seconds": 0.82,
+    "sha256": "24ab40e0c3bc3906403e05e1e6a16c56112896871a24d2569fddc0035f89ee25",
+    "path": "C:\\Users\\Jenny\\AppData\\Local\\Temp\\ich_restore_uwhx5q9t\\ich_heritage.dump"
+  },
+  "restore": {
+    "seconds": 1.49,
+    "stderr_head": []
+  },
+  "privilege_probe": {
+    "改 title（应允许）": "OK rowcount=1",
+    "改 right_level（应拒绝）": "42501",
+    "改 system_audit_log（应拒绝）": "42501"
+  },
+  "tx_drill": {
+    "commit": {
+      "asset_id": 1003,
+      "before": {
+        "asset": [
+          "public",
+          "pending",
+          1,
+          "2026-11-22T20:37:22.980277+08:00"
+        ],
+        "audits": [
+          [
+            5,
+            "pending",
+            null,
+            null,
+            null
+          ]
+        ],
+        "log_count": 1
+      },
+      "after": {
+        "asset": [
+          "derived",
+          "approved",
+          2,
+          "2026-11-26T23:33:45.618030+08:00"
+        ],
+        "audits": [
+          [
+            5,
+            "approved",
+            2,
+            "2026-11-26T23:33:45.618030+08:00",
+            "备份恢复演练：正常提交"
+          ]
+        ],
+        "log_count": 2
+      },
+      "result": {
+        "asset_id": 1003,
+        "audit_id": 5,
+        "right_level": "derived",
+        "audit_status": "approved",
+        "is_override": false,
+        "expert_name": "周文渊",
+        "db_audit_log_ids": [
+          136
+        ],
+        "message": "终审完成：改编衍生（与 AI 建议一致）"
+      }
+    },
+    "rollback": {
+      "asset_id": 1006,
+      "before": {
+        "asset": [
+          "public",
+          "pending",
+          1,
+          "2026-11-24T20:37:22.980277+08:00"
+        ],
+        "audits": [
+          [
+            12,
+            "pending",
+            null,
+            null,
+            null
+          ]
+        ],
+        "log_count": 1
+      },
+      "after": {
+        "asset": [
+          "public",
+          "pending",
+          1,
+          "2026-11-24T20:37:22.980277+08:00"
+        ],
+        "audits": [
+          [
+            12,
+            "pending",
+            null,
+            null,
+            null
+          ]
+        ],
+        "log_count": 1
+      },
+      "raised": "RuntimeError: fault injection: 终审写库后应用层异常（模拟进程崩溃前抛错）"
+    },
+    "gate": {
+      "asset_id": 1006,
+      "before": [
+        "public",
+        "pending"
+      ],
+      "error": {
+        "pgcode": "42501",
+        "msg": "ERROR:  终审结论必须由 approve_asset()/reject_asset() 写入（pending → approved）"
+      }
+    }
+  },
+  "checks": [
+    {
+      "ok": true,
+      "name": "pg_dump 可用",
+      "detail": "D:\\WorkBuddy\\2026-10-25-22-51-06_非遗数字资产确权溯源系统\\_env\\pgsql\\bin\\pg_dump.exe",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "pg_restore 可用",
+      "detail": "D:\\WorkBuddy\\2026-10-25-22-51-06_非遗数字资产确权溯源系统\\_env\\pgsql\\bin\\pg_restore.exe",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "pg_dump 退出码 0",
+      "detail": "",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "dump 文件非空",
+      "detail": "96404 字节，耗时 0.82s",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "dump 为 custom 格式（文件头 PGDMP）",
+      "detail": "b'PGDMP'",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "临时库创建成功",
+      "detail": "ich_restore_21588_bd088b",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "pg_restore 退出码 0 且无 ERROR",
+      "detail": "耗时 1.49s",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "表清单一致",
+      "detail": "12 项",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "视图清单一致",
+      "detail": "4 项",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "索引定义一致",
+      "detail": "26 项",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "约束集合一致",
+      "detail": "47 项",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "触发器定义一致",
+      "detail": "10 项",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "函数定义一致",
+      "detail": "11 项",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "枚举取值一致",
+      "detail": "3 项",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "表级授权一致",
+      "detail": "12 项",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "非法枚举值在两边同样被拒（22P02）",
+      "detail": "{\"源库\": \"22P02\", \"恢复库\": \"22P02\"}",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "各表行数一致",
+      "detail": "111 行 / 12 表",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "全表内容指纹一致",
+      "detail": "12 表",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "序列当前值一致（不会撞主键）",
+      "detail": "8 个序列",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "列级授权一致",
+      "detail": "532 条授权",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "三个业务角色存在且属性一致",
+      "detail": "{\"ich_admin\": [false, false], \"ich_expert\": [false, false], \"ich_heritor\": [false, false]}",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "业务角色均非超级用户",
+      "detail": "{\"ich_admin\": [false, false], \"ich_expert\": [false, false], \"ich_heritor\": [false, false]}",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "heritor 仍可改允许的列（授权未被一刀切）",
+      "detail": "OK rowcount=1",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "heritor 改 right_level 在恢复库中仍被列级授权拒绝",
+      "detail": "SQLSTATE=42501",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "heritor 改审计日志在恢复库中仍被拒绝",
+      "detail": "SQLSTATE=42501",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "维护账号仍可读（拒绝来自角色授权，不是库损坏）",
+      "detail": "count=8",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "HNSW 近邻检索可用且返回正确最近邻",
+      "detail": "期望 1002 实得 1002，写入 3 条",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "烟测向量已随事务回滚清除",
+      "detail": "残留 0 条",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "终审正常提交：asset 状态与版本号已更新",
+      "detail": "['public', 'pending', 1] → ['derived', 'approved', 2]",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "终审正常提交：audit_record 落定结论",
+      "detail": "",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "终审正常提交：触发器写入 system_audit_log",
+      "detail": "1 → 2",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "故障注入确实在事务中途抛出",
+      "detail": "RuntimeError: fault injection: 终审写库后应用层异常（模拟进程崩溃前抛错）",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "回滚后 asset 未变（状态/版本号/时间戳全同）",
+      "detail": "['public', 'pending', 1] vs ['public', 'pending', 1]",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "回滚后 audit_record 未变（没有半条结论）",
+      "detail": "",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "回滚后 system_audit_log 未变（触发器日志一并回滚）",
+      "detail": "1 vs 1",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "绕过应用直连改状态仍被数据库闸门拒绝",
+      "detail": "ERROR:  终审结论必须由 approve_asset()/reject_asset() 写入（pending → approved）",
+      "evidence": null
+    },
+    {
+      "ok": true,
+      "name": "临时库已删除",
+      "detail": "ich_restore_21588_bd088b",
+      "evidence": null
+    }
+  ],
+  "seconds": 11.6
+}

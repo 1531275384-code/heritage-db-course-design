@@ -1,0 +1,265 @@
+{
+  "generated_at": "2026-11-26T23:29:17",
+  "asset": {
+    "table": "public.asset",
+    "heap_bytes": 6832128,
+    "heap_pages": 834,
+    "live_tuples": 20008,
+    "toast_heap_bytes": 27312128,
+    "toast_index_bytes": 319488,
+    "toast_total_bytes": 27656192,
+    "toast_rows": 13334,
+    "index_bytes": 3334144,
+    "total_bytes": 37855232,
+    "indexes": [
+      {
+        "name": "idx_asset_file_hash",
+        "bytes": 2514944,
+        "def": "CREATE INDEX idx_asset_file_hash ON public.asset USING btree (file_hash)"
+      },
+      {
+        "name": "asset_pkey",
+        "bytes": 466944,
+        "def": "CREATE UNIQUE INDEX asset_pkey ON public.asset USING btree (asset_id)"
+      },
+      {
+        "name": "idx_asset_right_level",
+        "bytes": 163840,
+        "def": "CREATE INDEX idx_asset_right_level ON public.asset USING btree (right_level)"
+      },
+      {
+        "name": "idx_asset_owner_time",
+        "bytes": 155648,
+        "def": "CREATE INDEX idx_asset_owner_time ON public.asset USING btree (owner_id, created_at DESC)"
+      },
+      {
+        "name": "idx_asset_pending",
+        "bytes": 16384,
+        "def": "CREATE INDEX idx_asset_pending ON public.asset USING btree (created_at DESC) WHERE (audit_status = 'pending'::audit_status_enum)"
+      },
+      {
+        "name": "idx_asset_motif",
+        "bytes": 16384,
+        "def": "CREATE INDEX idx_asset_motif ON public.asset USING btree (motif_id) WHERE (motif_id IS NOT NULL)"
+      }
+    ]
+  },
+  "feature_vector": {
+    "table": "public.feature_vector",
+    "heap_bytes": 2105344,
+    "heap_pages": 257,
+    "live_tuples": 20000,
+    "toast_heap_bytes": 54624256,
+    "toast_index_bytes": 917504,
+    "toast_total_bytes": 55574528,
+    "toast_rows": 40000,
+    "index_bytes": 55091200,
+    "total_bytes": 112795648,
+    "indexes": [
+      {
+        "name": "idx_feature_vector_hnsw",
+        "bytes": 54624256,
+        "def": "CREATE INDEX idx_feature_vector_hnsw ON public.feature_vector USING hnsw (embedding vector_cosine_ops) WITH (m='16', ef_construction='64')"
+      },
+      {
+        "name": "feature_vector_pkey",
+        "bytes": 466944,
+        "def": "CREATE UNIQUE INDEX feature_vector_pkey ON public.feature_vector USING btree (fv_id)"
+      }
+    ]
+  },
+  "descriptions": [
+    {
+      "profile": "P1",
+      "label": "短描述（约 50 字，真实种子数据水平）",
+      "rows": 6666,
+      "avg_raw_bytes": 115.0,
+      "avg_stored_bytes": 116.0,
+      "max_stored_bytes": 116
+    },
+    {
+      "profile": "P2",
+      "label": "长描述（约 800 字中文，可压缩）",
+      "rows": 6667,
+      "avg_raw_bytes": 2584.0,
+      "avg_stored_bytes": 186.0,
+      "max_stored_bytes": 186
+    },
+    {
+      "profile": "P3",
+      "label": "超长描述（约 3840 字节高熵文本，压不动）",
+      "rows": 6667,
+      "avg_raw_bytes": 3844.0,
+      "avg_stored_bytes": 3844.0,
+      "max_stored_bytes": 3844
+    }
+  ],
+  "asset_row_sample": {
+    "row_bytes": 4072,
+    "title": 26,
+    "file_path": 30,
+    "description": 3844,
+    "file_hash": 65
+  },
+  "fv_row_sample": {
+    "row_bytes": 2128,
+    "embedding_stored": 2052,
+    "embedding_text_len": 4812,
+    "raw_float4_bytes": 2048
+  },
+  "per_row": {
+    "asset_heap": 341.6,
+    "asset_toast": 1382.8,
+    "asset_index": 166.7,
+    "fv_heap": 105.3,
+    "fv_toast": 2778.7,
+    "fv_index": 2754.6,
+    "split_total": 7529.7,
+    "asset_side_share_pct": 25.1
+  },
+  "toast_chunks_per_fv_row": 2.0,
+  "reads": [
+    {
+      "label": "列表页：走 owner 索引取 20 行（只展示列）",
+      "sql": "SELECT asset_id, title, right_level, audit_status, created_at FROM asset WHERE owner_id = 1 ORDER BY created_at DESC LIMIT 20",
+      "ms": 0.083,
+      "top_hit_pages": 5,
+      "top_read_pages": 2,
+      "sum_hit_pages": 26,
+      "sum_read_pages": 0,
+      "plan_head": [
+        "Limit  (cost=0.29..2.65 rows=20 width=49) (actual time=0.056..0.065 rows=20 loops=1)",
+        "  Buffers: shared hit=5 read=2 written=2",
+        "  ->  Index Scan using idx_asset_owner_time on asset  (cost=0.29..2360.86 rows=20003 width=49) (actual time=0.055..0.061 rows=20 loops=1)",
+        "        Index Cond: (owner_id = 1)",
+        "        Buffers: shared hit=5 read=2 written=2",
+        "Planning:"
+      ]
+    },
+    {
+      "label": "列表页：同样 20 行，多带 description",
+      "sql": "SELECT asset_id, title, description, right_level, audit_status, created_at FROM asset WHERE owner_id = 1 ORDER BY created_at DESC LIMIT 20",
+      "ms": 0.052,
+      "top_hit_pages": 4,
+      "top_read_pages": 0,
+      "sum_hit_pages": 8,
+      "sum_read_pages": 0,
+      "plan_head": [
+        "Limit  (cost=0.29..2.65 rows=20 width=155) (actual time=0.023..0.033 rows=20 loops=1)",
+        "  Buffers: shared hit=4",
+        "  ->  Index Scan using idx_asset_owner_time on asset  (cost=0.29..2360.86 rows=20003 width=155) (actual time=0.021..0.029 rows=20 loops=1)",
+        "        Index Cond: (owner_id = 1)",
+        "        Buffers: shared hit=4",
+        "Planning Time: 0.174 ms"
+      ]
+    },
+    {
+      "label": "不拆表假设：同样 20 行，连带 512 维向量",
+      "sql": "SELECT x.asset_id, x.title, x.right_level, x.audit_status, x.created_at, f.embedding FROM (SELECT asset_id, title, right_level, audit_status, created_at FROM asset WHERE owner_id = 1 ORDER BY created_at DESC LIMIT 20) x JOIN feature_vector f ON f.asset_id = x.asset_id",
+      "ms": 5.808,
+      "top_hit_pages": 182,
+      "top_read_pages": 79,
+      "sum_hit_pages": 386,
+      "sum_read_pages": 0,
+      "plan_head": [
+        "Hash Join  (cost=2.90..535.10 rows=20 width=67) (actual time=0.231..5.767 rows=20 loops=1)",
+        "  Hash Cond: (f.asset_id = asset.asset_id)",
+        "  Buffers: shared hit=182 read=79 dirtied=91 written=79",
+        "  ->  Seq Scan on feature_vector f  (cost=0.00..457.00 rows=20000 width=26) (actual time=0.189..3.862 rows=20000 loops=1)",
+        "        Buffers: shared hit=178 read=79 dirtied=91 written=79",
+        "  ->  Hash  (cost=2.65..2.65 rows=20 width=49) (actual time=0.028..0.030 rows=20 loops=1)"
+      ]
+    },
+    {
+      "label": "（反例）直接写 join 不限行：规划器退化为全表排序",
+      "sql": "SELECT a.asset_id, a.title, a.right_level, a.audit_status, a.created_at, f.embedding FROM asset a JOIN feature_vector f ON f.asset_id = a.asset_id WHERE a.owner_id = 1 ORDER BY a.created_at DESC LIMIT 20",
+      "ms": 22.872,
+      "top_hit_pages": 1091,
+      "top_read_pages": 0,
+      "sum_hit_pages": 5208,
+      "sum_read_pages": 0,
+      "plan_head": [
+        "Limit  (cost=2375.71..2375.76 rows=20 width=67) (actual time=22.398..22.402 rows=20 loops=1)",
+        "  Buffers: shared hit=1091",
+        "  ->  Sort  (cost=2375.71..2425.70 rows=19995 width=67) (actual time=22.397..22.399 rows=20 loops=1)",
+        "        Sort Key: a.created_at DESC",
+        "        Sort Method: top-N heapsort  Memory: 27kB",
+        "        Buffers: shared hit=1091"
+      ]
+    },
+    {
+      "label": "全表扫描 asset（不含向量）",
+      "sql": "SELECT count(*), sum(file_size), max(created_at) FROM asset",
+      "ms": 7.098,
+      "top_hit_pages": 834,
+      "top_read_pages": 0,
+      "sum_hit_pages": 1675,
+      "sum_read_pages": 0,
+      "plan_head": [
+        "Aggregate  (cost=1184.14..1184.15 rows=1 width=48) (actual time=7.065..7.066 rows=1 loops=1)",
+        "  Buffers: shared hit=834",
+        "  ->  Seq Scan on asset  (cost=0.00..1034.08 rows=20008 width=16) (actual time=0.009..2.458 rows=20008 loops=1)",
+        "        Buffers: shared hit=834",
+        "Planning:",
+        "  Buffers: shared hit=7 read=2 written=2"
+      ]
+    },
+    {
+      "label": "全表扫描 + 逐行取向量（不拆表时的等价读法）",
+      "sql": "SELECT count(*), sum(a.file_size), max(a.created_at), sum(f.embed_dim) FROM asset a JOIN feature_vector f ON f.asset_id = a.asset_id",
+      "ms": 20.482,
+      "top_hit_pages": 1091,
+      "top_read_pages": 0,
+      "sum_hit_pages": 4118,
+      "sum_read_pages": 0,
+      "plan_head": [
+        "Aggregate  (cost=1993.69..1993.70 rows=1 width=56) (actual time=20.297..20.300 rows=1 loops=1)",
+        "  Buffers: shared hit=1091",
+        "  ->  Hash Join  (cost=1284.18..1793.69 rows=20000 width=18) (actual time=9.604..17.222 rows=20000 loops=1)",
+        "        Hash Cond: (f.asset_id = a.asset_id)",
+        "        Buffers: shared hit=1091",
+        "        ->  Seq Scan on feature_vector f  (cost=0.00..457.00 rows=20000 width=10) (actual time=0.015..1.880 rows=20000 loops=1)"
+      ]
+    },
+    {
+      "label": "向量近邻检索：HNSW top-5",
+      "sql": "SELECT asset_id FROM feature_vector ORDER BY embedding <=> (SELECT embedding FROM feature_vector LIMIT 1) LIMIT 5",
+      "ms": 3.054,
+      "top_hit_pages": 1353,
+      "top_read_pages": 6,
+      "sum_hit_pages": 2722,
+      "sum_read_pages": 0,
+      "plan_head": [
+        "Limit  (cost=783.63..790.45 rows=5 width=16) (actual time=1.804..2.000 rows=5 loops=1)",
+        "  Buffers: shared hit=1353 read=6 written=6",
+        "  InitPlan 1 (returns $0)",
+        "    ->  Limit  (cost=0.00..0.02 rows=1 width=18) (actual time=0.016..0.017 rows=1 loops=1)",
+        "          Buffers: shared hit=1",
+        "          ->  Seq Scan on feature_vector feature_vector_1  (cost=0.00..457.00 rows=20000 width=18) (actual time=0.015..0.016 rows=1 loops=1)"
+      ]
+    },
+    {
+      "label": "向量近邻检索：顺序扫描基线（关索引）",
+      "sql": "SELECT asset_id FROM feature_vector ORDER BY embedding <=> (SELECT embedding FROM feature_vector LIMIT 1) LIMIT 5",
+      "ms": 209.741,
+      "top_hit_pages": 117450,
+      "top_read_pages": 2808,
+      "sum_hit_pages": 352353,
+      "sum_read_pages": 0,
+      "plan_head": [
+        "Limit  (cost=839.22..839.23 rows=5 width=16) (actual time=209.713..209.716 rows=5 loops=1)",
+        "  Buffers: shared hit=117450 read=2808 written=2580",
+        "  InitPlan 1 (returns $0)",
+        "    ->  Limit  (cost=0.00..0.02 rows=1 width=18) (actual time=0.008..0.009 rows=1 loops=1)",
+        "          Buffers: shared hit=1",
+        "          ->  Seq Scan on feature_vector feature_vector_1  (cost=0.00..457.00 rows=20000 width=18) (actual time=0.008..0.008 rows=1 loops=1)"
+      ]
+    }
+  ],
+  "sandbox": "ich_stor_28980_45f3069d",
+  "seed": {
+    "rows": 20000,
+    "owner_id": 1,
+    "seed_seconds": 119.37
+  }
+}

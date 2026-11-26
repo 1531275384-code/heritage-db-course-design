@@ -59,6 +59,13 @@
 
 | 文件 | 是什么 | 谁产生 |
 |---|---|---|
+| `验收记录-20261126.md` | 真库验收的六节完整记录（含 HNSW 对照实验与缺口说明） | 手工整理 |
+| `物理存储与TOAST实测-20261126.md` | `asset` / `feature_vector` 的堆、TOAST、HNSW 索引实测与读取成本对照 | `scripts/bench_storage.py` |
+| `备份恢复演练-20261126.md` | 真实 `pg_dump` → 恢复临时库 → 逐对象比对 → 终审事务提交/回滚实证 | `tests/test_backup_restore.py` |
+| `storage_<时间戳>.{md,json}` | 上述存储实测的机器输出（md 给人看，json 留原始数值） | `scripts/bench_storage.py` |
+| `backup_restore_<时间戳>.json` | 备份恢复演练 37 条断言的逐条证据 | `tests/test_backup_restore.py` |
+| `check_pg_*.log` / `concurrency_*.log` / `rules_parity_*.log` | 各验收套件的原始终端输出，用于回溯 | 对应测试套件 |
+| `bench_<时间戳>.{md,json}` | HNSW 与顺序扫描的对照测量 | `scripts/bench_pg.py` |
 | `完整流程运行报告.md` | 用少量样本实跑完整业务链路的逐步记录与结论 | 手工整理 |
 | `run_result.json` | 上述实跑每一步的原始返回，`build_docx.py` 与 `build_demo_page.py` 会读它填数 | `run_full_flow.py` |
 | `run_full_flow.py` | 实跑脚本本身，可重跑复现 | — |
