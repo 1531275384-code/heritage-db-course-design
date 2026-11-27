@@ -3,7 +3,11 @@
 > 一句话用法：**先找你要的那一行，照着「入口」一列敲命令。**
 > 本文件只回答「怎么进、产物在哪、怎么验证」；深度说明在 `docs/README.md` 指向的各文档里。
 >
-> 更新日期：2026-11-08　适用状态：568 项测试（13 套）全绿，真实 PostgreSQL 已跑通，规则表与库逐条对账，规则对拍 100% 一致
+> 更新日期：2026-11-27　适用状态：641 项测试（15 套）全绿，PostgreSQL 16.15 + pgvector 0.8.6 原生实例实测通过，规则表与库逐条对账，规则对拍 100% 一致
+>
+> 对象规模：**8 张业务表 / 4 视图 / 10 触发器 / 14 个显式索引**；按系统目录口径为
+> **12 张表（8 业务 + 4 系统目录）/ 26 个索引（14 显式 + 8 主键 + 3 唯一约束 + 1 部分唯一索引）/ 11 个函数**。
+> 三方差集见 [`docs/verify/SQL对象清点-20261127.md`](docs/verify/SQL对象清点-20261127.md)。
 
 ---
 
@@ -24,15 +28,15 @@
 
 ---
 
-## 1. 八条线总览
+## 1. 九条线总览
 
 | # | 线 | 入口（一条命令 / 一个动作） | 主产物 | 验证方式 |
 |---|---|---|---|---|
 | 1 | 业务系统（Web 服务） | `python bootstrap.py` | 运行中的服务 + `app/` | `python -m app.cli demo-check` |
 | 2 | 纯界面演示页 | 双击 `output/01-交付物/演示页面.html` | 单文件 HTML 2.3 MB | `python -m tests.check_demo_page` |
 | 3 | 互动版演示页 | 双击 `output/01-交付物/演示页面_互动版.html` | 单文件 HTML 0.7 MB | `python -m tests.check_demo_v2` |
-| 4 | 测试基线 | `python tests/run_all.py` | 568 项断言（13 套，含真库） | 自身就是验证手段 |
-| 5 | 数据库 | `python -m scripts.pg_run --reset` | 8 表 3 视图 9 触发器 | `python -m tests.check_pg` |
+| 4 | 测试基线 | `python tests/run_all.py` | 641 项断言（15 套，含真库） | 自身就是验证手段 |
+| 5 | 数据库 | `python -m scripts.pg_run --reset` | 8 表 4 视图 10 触发器 14 索引 | `python -m tests.check_pg` |
 | 6 | 交付说明书 | `python scripts/build_docx.py` | `output/01-交付物/*.docx` | `python scripts/preview_docx.py` |
 | 7 | 课程作业两件套 | `python scripts/build_coursework.py` | `output/04-课程作业/` | 产物自检 + 提交说明 |
 | 8 | 研究化改造（进行中） | 读路线图 | `sim/`（规则层已落地） | `python -m tests.test_rules_sync` |
@@ -102,7 +106,7 @@
 
 两份演示页的区别见 `docs/01-工程说明书/交付物说明.md`。
 
-### 线 4　测试基线（568 项 / 13 套）
+### 线 4　测试基线（641 项 / 15 套）
 
 | 项 | 内容 |
 |---|---|
@@ -133,7 +137,7 @@
 
 | 项 | 内容 |
 |---|---|
-| **SQL 源** | `sql/00_compat_vector.sql`（降级向量层）→ `01_init.sql`（8 表 / 约束 / GRANT）→ `02_index_trigger_view.sql`（索引 / 9 触发器 / 3 视图）→ `03_seed.sql`（种子） |
+| **SQL 源** | `sql/00_compat_vector.sql`（降级向量层）→ `01_init.sql`（8 表 / 约束 / GRANT）→ `02_index_trigger_view.sql`（索引 / 10 触发器 / 4 视图）→ `03_seed.sql`（种子） |
 | 便携库重建 | `python -m scripts.pg_run --reset`　自动起 PG 16.2（端口 55432）并顺序执行，120 条语句 / 约 1.6 秒 |
 | 只看不跑 | `python -m scripts.pg_run --dry-run` |
 | 标准库（Docker） | `docker compose up -d` 后 `python scripts/init_db.py` |
@@ -195,9 +199,9 @@
 | 漂移检测 | `python -m scripts.gen_rules --check`　SQL 改了没重新生成 → 退出码 1 |
 | 与库对账 | `python -m scripts.gen_rules --verify-db --dsn "host=127.0.0.1 port=55432 user=postgres dbname=heritage"` |
 | 判定层 | `sim/verdict.py`　`check_row()` 行内规则、`check_operation()` 含触发器语义 |
-| 验证 | `python -m tests.test_rules_sync`　59 项（离线）｜`python -m tests.test_rules_parity`　75 项（真库对拍） |
+| 验证 | `python -m tests.test_rules_sync`　66 项（离线）｜`python -m tests.test_rules_parity`　79 项（真库对拍） |
 | 机制自证 | `python scripts/probe_drift.py`　故意改 SQL，确认检测真的报错（自动还原） |
-| 覆盖 | 24 CHECK / 4 UNIQUE（含 1 个部分唯一索引）/ 12 外键 / 53 NOT NULL / 9 触发器 |
+| 覆盖 | 24 CHECK / 4 UNIQUE（含 1 个部分唯一索引）/ 12 外键 / 53 NOT NULL / 10 触发器 |
 
 **为什么不手抄**：手抄的规则表与 SQL 迟早偏离，而偏离方向通常是「SQL 严、Python 松」，
 仿真会跑得好好的而真实系统拒绝写入 —— 这类错误在论文里表现为「仿真结论不可复现」。
