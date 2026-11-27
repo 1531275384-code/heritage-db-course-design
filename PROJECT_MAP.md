@@ -7,7 +7,9 @@
 >
 > 对象规模：**8 张业务表 / 4 视图 / 10 触发器 / 14 个显式索引**；按系统目录口径为
 > **12 张表（8 业务 + 4 系统目录）/ 26 个索引（14 显式 + 8 主键 + 3 唯一约束 + 1 部分唯一索引）/ 11 个函数**。
-> 三方差集见 [`docs/verify/SQL对象清点-20261127.md`](docs/verify/SQL对象清点-20261127.md)。
+>
+> 分支：本仓库只有 `iteration/ai-traceability` 一条。初期原型（2026-11-23 原始上传，`01_数据库脚本/` 旧结构）
+> 已归档到 [`heritage-course-design-archive`](https://github.com/1531275384-code/heritage-course-design-archive)。
 
 ---
 
@@ -23,7 +25,7 @@
 想读文档    →  docs/README.md
 想跑测试    →  python tests/run_all.py
 要改数据库  →  sql/   +  python -m scripts.pg_run --reset
-下一步做什么 →  docs/02-研究规划/研究方向精进路线图.md
+要看实测证据 →  docs/verify/
 ```
 
 ---
@@ -39,7 +41,7 @@
 | 5 | 数据库 | `python -m scripts.pg_run --reset` | 8 表 4 视图 10 触发器 14 索引 | `python -m tests.check_pg` |
 | 6 | 交付说明书 | `python scripts/build_docx.py` | `output/01-交付物/*.docx` | `python scripts/preview_docx.py` |
 | 7 | 课程作业两件套 | `python scripts/build_coursework.py` | `output/04-课程作业/` | 产物自检 + 提交说明 |
-| 8 | 研究化改造（进行中） | 读路线图 | `sim/`（规则层已落地） | `python -m tests.test_rules_sync` |
+| 8 | 规则验证 | `sim/` 规则表达式与判定 | SQL 规则自动生成 | `python -m tests.test_rules_sync` |
 | 9 | 规则单一真相 | `python -m scripts.gen_rules` | `sim/rules.py`（自动生成） | `--check` + `--verify-db` + `tests.test_rules_parity` |
 
 **依赖顺序**：1 依赖 5；6、7 依赖 1 的代码与 `data/`；2、3 依赖 `data/seed_demo.json`；8 依赖 5 已跑通。
@@ -130,7 +132,7 @@
 | browser | `shoot_ui` | 49 | Playwright |
 | browser | `check_demo_page` | 52 | Playwright |
 | browser | `check_demo_v2` | 58 | Playwright |
-| db | `check_pg` | 46（45 通过 / 1 缺口） | 真实 PostgreSQL |
+| db | `check_pg` | 46（50 通过 / 0 缺口） | 真实 PostgreSQL |
 | db | `test_rules_parity` | 79 | 真实 PostgreSQL |
 
 ### 线 5　数据库
@@ -143,7 +145,7 @@
 | 标准库（Docker） | `docker compose up -d` 后 `python scripts/init_db.py` |
 | 灌种子 | `python scripts/init_seed.py`（`--dry-run` 先看） |
 | 种子护栏 | `python scripts/check_seed.py`　校验 AI 字段是真实算法输出而非手编 |
-| 验收 | `python -m tests.check_pg`　46 项（45 通过 / 1 项 HNSW 缺口） |
+| 验收 | `python -m tests.check_pg`　50 项（50 通过 / 0 缺口） |
 
 `scripts/pg_run.py` 是**不需要 psql 的 SQL 执行器**，自己实现了 `\i` / `\if` / `\gset` / `\set` 与变量替换。
 便携库在 `.pgpkg/`（22.8 MB 二进制），只监听 127.0.0.1，端口 **55432**、库名 **heritage**。
@@ -179,17 +181,16 @@
 | 可运行工程 | `课程作业_代码包.zip`（0.93 MB，80 文件）与 `课程作业_代码包/code/` 同源 |
 | 生成 | `python scripts/build_coursework.py`　所有数字现场扫描，改数据重跑即同步 |
 
-### 线 8　研究化改造（进行中）
+### 线 8　规则验证
 
 | 项 | 内容 |
 |---|---|
-| **当前唯一真相源** | `docs/02-研究规划/研究方向精进路线图.md` |
-| 已完成 | P0-2 真实 PostgreSQL 跑通；P0-3 步骤 2 规则表自动生成与对账 |
-| 下一个 | P0-3 步骤 3：`tests/test_rules_parity.py`（≥40 组样本，两边判定 100% 一致） |
+| **当前唯一真相源** | `docs/verify/` |
+| 验证基线 | 15 套 / 641 项断言全通过；SQL 规则同步及数据库对拍均已纳入自动验收 |
 | 将要新增 | `sim/env`、`sim/runner`、`sim/metrics`、`policies/`、`scenarios/`（YAML） |
 | 现状 | `sim/` 已有 ruleast / rules / verdict 三个文件，其余不要提前建空壳 |
 
-### 线 9　规则单一真相（P0-3 步骤 2 已落地）
+### 线 9　SQL 规则同步
 
 同一套业务规则只允许有一份源头：`sql/`。`sim/rules.py` 由生成器从 SQL 抽取，不手抄。
 
@@ -272,7 +273,7 @@
 **推论**：以后要改这些路径，正确顺序是「改常量 → 改测试 → 改文档文字 → 重跑全部产物」，
 不能只 `mv` 目录。`output/产物清单.md` 第六节记着上一次这么改的完整对照表，可以照抄流程。
 
-**唯一可以自由增删的**：`docs/` 下的文档、`output/03-过程材料/`、任何 `__pycache__`。
+**文档与交付导航**：`docs/` 下的说明和实测证据、`output/` 下的正式交付物。
 
 ---
 
@@ -288,4 +289,4 @@
 | 要用真库跑起来给人看 | `ICH_DB_PORT=55432 ICH_DB_NAME=heritage python bootstrap.py --strict` |
 | 改了种子数据 | `python scripts/check_seed.py` → `python scripts/build_docx.py` → `python scripts/build_coursework.py` |
 | 只想交作业 | 压缩 `output/04-课程作业/` 整个目录 |
-| 想知道接下来做什么 | `docs/02-研究规划/研究方向精进路线图.md` 第 2 节优先级表 |
+| 想核实实测结果 | `docs/verify/` 中的验收、性能与备份恢复报告 |

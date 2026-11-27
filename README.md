@@ -1,7 +1,10 @@
 # 面向非遗纹样作品的分级审核与授权溯源数据库系统设计
 
 > **本仓库默认分支：`iteration/ai-traceability`（迭代版 v2，即当前首页）。**
-> **课程最终验收技术栈：PostgreSQL + pgvector（当前分支）。** `main` 分支的 MySQL + Flask 版本仅作为初期原型演进历史简述，不属于本分支验收环境。
+> **课程最终验收技术栈：PostgreSQL + pgvector（当前分支）。**
+> 初期原型（MySQL + Flask，`01_数据库脚本/` 旧目录结构，2026-11-23 的原始上传）已归档到独立仓库
+> [`heritage-course-design-archive`](https://github.com/1531275384-code/heritage-course-design-archive)，
+> 本仓库只保留迭代版，不再有 `main` / `origin` 之类的旧分支。
 > 两个版本的演进关系、技术栈差异与新增能力见 [迭代说明.md](迭代说明.md)。
 
 本项目定位为课程设计数据库系统：面向非遗纹样作品，提供 AI 辅助分级建议、专家人工审核与全链路授权溯源。
@@ -669,12 +672,8 @@ UPDATE asset SET right_level = 'original' WHERE asset_id = 1;
 │   │   ├── 项目说明与进展证明清单.md   # 大白话版项目说明 + 阶段证明材料清单
 │   │   ├── 交付物说明.md              # 四份交付物的打开方式、结构与使用动线
 │   │   └── 演示前端与示例数据说明.md   # 怎么启动 / 看到什么 / 数据从哪来
-│   ├── 02-研究规划/
-│   │   └── 研究方向精进路线图.md       # ★ 待办真相源：15 项研发排期与完成标准
 │   ├── 03-选题材料/
 │   │   └── 选题报告.md                # 选题论证 Markdown 源（Word 版在 output/）
-│   ├── 04-归档/
-│   │   └── 后续工作计划与前端说明.md   # 已作废（2026-10-26 的判断），仅留档
 │   └── verify/                     # 证据而非说明：实跑报告 + 原始 JSON + PG 重建日志
 │                                   # 路径被 build_docx.py 写进 Word 正文，勿改名
 │
@@ -692,8 +691,6 @@ UPDATE asset SET right_level = 'original' WHERE asset_id = 1;
 │   │   ├── 自动验收/                # shoot_ui.py 产出（四角色五页签）
 │   │   ├── 演示页验收/              # check_demo_page.py 产出
 │   │   └── 互动版验收/              # check_demo_v2.py 产出
-│   ├── 03-过程材料/                 # 不交，留档备查
-│   │   └── 选题报告流水线/          # 选题报告生成过程中的 stage2/3、修补脚本
 │   │
 │   └── 04-课程作业/                 # ★ 按课程要求组织的「代码 + 数据」两件套
 │       ├── 提交说明.md              # 一页纸：30 秒上手、目录对照、两个边界
@@ -921,7 +918,7 @@ CREATE TRIGGER trg_syslog_immutable
 >
 > 这也解释了脚本里一个容易被误读的计数：`DROP TRIGGER IF EXISTS` 有 **11** 条，`CREATE TRIGGER` 只有 **10** 条。
 > 差的就是它 —— `DROP` 保留下来是为了兼容旧库升级（老库里那条还在，脚本要先摘掉）。
-> 三方差集已逐条核过，见 [`docs/verify/SQL对象清点-20261127.md`](docs/verify/SQL对象清点-20261127.md)。
+> 触发器与视图数量以 SQL 定义及 PostgreSQL 系统目录实测为准。
 
 **关键性质：触发器与主事务同生共死。** `AFTER UPDATE` 触发器在同一事务内执行，主业务回滚时审计日志一并回滚 —— 不会留下"操作没成功但日志说成功"的脏记录。
 
@@ -1209,263 +1206,19 @@ python -m app.cli demo-check
 
 ---
 
-## 13. 已知限制
+## 13. 运行模式与部署注意事项
 
-我们把这些写清楚，而不是藏在角落。
+### 13.1 演示模式
 
-### 13.1 真实 PostgreSQL + pgvector 验证状态
+`--demo` 使用内置示例数据，适合功能讲解、界面演示和教学体验。演示数据保存在应用进程中，重启后恢复初始状态；该模式不连接 PostgreSQL，不代表生产数据存储、并发控制或权限配置状态。需要验证数据库能力时，请按本说明启动 PostgreSQL + pgvector 并运行验收套件。
 
-**状态：已解除。现在是本机原生实例实测，不再靠静态校验兜底。**
+### 13.2 部署建议
 
-开发早期，本机系统安全策略禁止执行 `initdb`，也无法安装 C 编译器（因此装不了 pgvector），
-三个建库脚本一度**没有在任何真实数据库上跑过**。这一段当时是主动写明的限制，不是模糊带过。
+- 面向真实用户部署时，建议在反向代理或应用入口启用请求限流，并按业务规模配置访问控制与监控。
+- 建立定期备份与恢复演练流程；生产部署应根据恢复目标配置异地备份及 PostgreSQL WAL 归档策略。
+- 基础安装覆盖轻量特征提取；启用 CLIP、ResNet 等深度特征后端时，按目标硬件安装 `requirements-deep.txt` 中的依赖。
+- 数据库部署使用 PostgreSQL；需要原生向量检索时安装并启用 pgvector。启动参数、初始化步骤及验证命令见前文与交付说明。
 
-后来改用 `micromamba` 从 conda-forge 装同 ABI 的 MSVC 构建，在用户目录落地了一个**原生实例**（非容器），
-限制不复存在。当前实测：
+### 13.3 实测基线
 
-| 项 | 实测值 |
-|---|---|
-| PostgreSQL | **16.15** 原生实例，端口 55433，`shared_buffers` 与 `work_mem` 为默认值 |
-| pgvector | **0.8.6**，`<=>` 走 HNSW 索引（`EXPLAIN` 已核对，非仅建了索引） |
-| 建库脚本 | `sql/00 → 03` 全量执行通过，落地 8 张业务表 / 4 视图 / 10 触发器 / 14 个显式索引 / 532 条列级授权 |
-| 真库验收 | `python -m tests.check_pg --require-hnsw` → **50 通过 / 0 缺口** |
-| 并发 / 对拍 / 备份 | 多会话 30 项、规则对拍 79 项、备份恢复 37 项，全部通过 |
-| 全量回归 | `python tests/run_all.py --all` → **15 套 / 641 项 / 0 失败** |
-
-HNSW 不再只是"配好了"：5000 行实测 **0.76 ms vs 顺序扫描 22.31 ms**；2 万行实测 **3.05 ms vs 209.74 ms**。
-拆表的收益也量出来了 —— 同一列表查询读 20 行，只取展示列 **5 页**，连带向量 **182 页**（36.4×）。
-
-证据都在 [`docs/verify/`](docs/verify/)：
-
-| 报告 | 内容 |
-|---|---|
-| `验收记录-20261126.md` | 真库验收六节完整记录，含 HNSW 对照实验与缺口说明 |
-| `物理存储与TOAST实测-20261126.md` | 2 万行下的堆 / TOAST / 索引尺寸与读取成本 |
-| `备份恢复演练-20261126.md` | 真跑 `pg_dump` → 恢复临时库 → 逐对象比对 |
-| `SQL对象清点-20261127.md` | 触发器/视图/索引数量的三方对账 |
-
-**仍然存在的边界**（如实记，不因为跑通了就抹掉）：
-
-1. **没有测冷缓存**：Windows 无 `drop_caches`，耗时仅作同机参考；跨机器比较应以缓冲区页数为准。
-2. **备份是逻辑备份**：未做 WAL 归档 / PITR，恢复不到"误删前一秒"；未做加密与异地传输。
-3. **同集群恢复**：业务角色是集群级对象，未验证目标集群缺角色的异地恢复。
-4. **谱系表无写入入口**：`asset_genealogy` 目前零行，触发器与递归视图已就位并有并发测试覆盖，
-   但应用层没有登记血缘的 API，`ich_heritor` 也没有该表的 `INSERT` 权限。
-
-静态验证措施仍然保留，作为"不启数据库也能跑"的第一道网（全部仍通过）：
-
-| 措施 | 覆盖范围 |
-|---|---|
-| SQL 静态结构校验 | 解析 `$$` 块 / 字符串 / 注释 / psql 元命令，校验 8 表 4 视图 3 角色、外键目标、触发器函数、关键约束/索引 |
-| 88 项源码级不变量 | AI 不写 `right_level`、终审单事务、列级 GRANT、追加式日志、前端 XSS 转义、种子 AI 字段真实性、视图列与 Pydantic 同步 |
-| 39 项兼容层验证 | `<=>` 与 pgvector cosine 距离**数值一致**（含 4 类边界）、归一化后内积=1-距离、`\if` 配对、无裸 `::vector` |
-| 52 项端到端 | 进程内起服务，跑完整 15 个业务场景（**接口与业务逻辑是真跑过的**） |
-| 49 项浏览器 UI 断言 | 四角色 × 5 页签逐屏渲染 + 数值级断言（作品数、母题数、授权费合计、无 `undefined`） |
-| 52 项纯界面版验收 | `file://` 直开、左栏已移除且演示区占满整宽、身份切换、越权页签、AI 分析、终审推翻、台账金额、重置、断网零请求 |
-| 58 项互动版验收 | 拖动滑块（半程不通过 / 全程通过）、错误密码、角色可见性、多选批量、终审 4 档位与意见校验、推翻留痕、阈值联动、设置开关、重置 |
-| AI 模块全量实测 | 特征引擎 17 项 + 分级器 24 项，不依赖数据库 |
-
-真库跑通之前，关键路径是靠"逐行读代码 + 写回归检查"过的；真库可用之后又逐条复核了一遍。
-这套做法**主动发现并修掉了十二个会导致业务失败或界面错误的设计缺陷**：
-
-| # | 缺陷 | 后果 | 修复 |
-|---|---|---|---|
-| 1 | `audit_record` 上挂了 `trg_audit_record_immutable`（`BEFORE UPDATE OR DELETE` → `fn_forbid_modify`） | 该触发器对**任何** UPDATE 都抛异常，专家终审执行 `UPDATE audit_record SET state='approved'` 必然失败 —— **整条终审链路走不通** | 删掉该触发器；由 `trg_audit_record_no_delete`（禁删）+ `trg_audit_record_guard`（禁改已终审，放行状态迁移）分工实现 |
-| 2 | `analyze_asset` 重复分析时，把旧 pending 流水 **UPDATE 成 `rejected` 并硬塞一个 `expert_id`** | 凭空产生一次"专家驳回"，污染 `is_override` 与专家工作量统计 | 改为不删不改：允许多条 pending 并存，查询侧（`v_asset_pending_audit` 的 `LATERAL ... LIMIT 1`）只取最新一条 |
-| 3 | 触发器 `fn_motif_vector_normalize` 里 `unnest(NEW.base_vector::real[])` 与 `(... / v_norm)::vector` | `vector` 与 `real[]` 的转换依赖 pgvector 版本；在降级模式下（`NUMERIC[]`）**直接语法错误**，整个 `02` 脚本会中断 | 改用 `ich_vector_is_native()` 运行时分支：原生走 `::real[]`，降级直接 `unnest` 数组。**这条是被 `test_compat_vector.py` 抓出来的** |
-| 4 | 前端统计卡片 `${sum.by_status.approved}` / `${sum.by_level.public}` 直接取值 | 后端 `GROUP BY` **只返回实际存在的分组**，没有已确权资产时 `approved` 键根本不存在，取出来是 `undefined` —— 界面首屏就显示「undefined 件」，真库模式同样会犯 | 两处统计渲染统一加 `nz()` 兜底成 0；新增 2 项不变量检查（正则扫描直接取值 + 校验 `nz()` 存在） |
-| 5 | `demo.list_my_assets()` 只返回 8 列，而 `services.list_my_assets()` 的 SQL 查 9 列（少了 `version_no` / `updated_at`） | 演示模式「我的作品」的**版本列渲染成 `vundefined`**。这类"两套实现字段漂移"在演示模式看不出来，切到真库才暴露，属于典型的两头都测过、拼接处没测 | 演示实现补齐 9 列并注释"必须与真实实现逐列一致"；前端版本列加 `nz()` 兜底；新增 3 项不变量检查做**静态列集合比对**（`services.py` 的 SELECT 子句 vs `demo.py` 的字典键 vs `app.js` 的 `a.xxx` 引用） |
-| 6 | `openLicense()` 无条件请求 `GET /api/users` | 该接口限 `expert`/`admin`，传承人打开自己的授权弹窗时浏览器 console 留一条 403 红字（功能不受影响，但显得不干净） | 按 `S.user.role` 判断，传承人跳过该请求（外部机构名称手填即可） |
-| 7 | `v_asset_trace_chain` 的 `seq_no` 是按**事件类型写死的常量**（root=1/audit=2/license=3/system_log=4） | 一条链上必然有多个 `system_log`（登记、分析、终审各触发一次），前端时间轴显示成 **`1→4→4→2→4→3`** 的乱序。真实库与演示模式写法一致，**真库同样会犯** | 视图保持「事实投影」职责不变，由应用层（`services.trace_asset` / `demo.trace_asset`）按 `event_at` 重编 1..N；同毫秒节点保留视图原序以保证「业务事件排在其触发的审计快照之前」 |
-| 8 | 分析流程的 `UPDATE asset` 里**没有 `motif_id`** | `01_init.sql:114` 建了 `motif_id`（母题血缘）+ 外键 `fk_asset_motif`，`v_asset_ledger` 也 JOIN 它输出 `motif_code`/`motif_name`，但生产代码从未写入 —— 台账「母题」列恒为 `—`，衍生作品统计恒为 0 | 判为 `public`/`derived` 时写入 Top-1 母题的 id，判为 `original` 时保持 `NULL`；两侧实现同步修复 |
-| 9 | 种子数据里的 `similarity_json` 用了 `ai_confidence` 冒充相似度 | 置信度 ≈ 0.42、真实余弦相似度 ≈ 0.81，母题关联页显示 0.4190 而非 0.8059 —— **数字是错的，但看起来像对的**。这比报错更危险：演示时没人会怀疑一个格式正常的数字 | 种子补 `similarity` 字段（余弦），`_snapshot_for()` 只认 `similarity`；新增不变量「`similarity` 必须 ≠ `ai_confidence`」，防止再次混用 |
-| 10 | 种子 AI 结论是**手填**的（8 件里有 2 件与真实算法输出不符，如作品 5 手填 `public`，实际算得 0.8783 → `derived`） | 演示时台账显示 `derived`，观众点「重新分析」AI 改判 `original` —— **整套演示的可信度归零** | 原则修正：种子不虚构 AI 结论，只描述真实算法会得出什么。写 `scripts/check_seed.py` 从算法回写全部 `ai_suggest_level` / `ai_confidence` / `similarity`，并加 15 项种子不变量守住 |
-| 11 | 视图加了 `top1_similarity`，但只改了 SQL、**没改 `LedgerRow`** | Pydantic v2 默认丢弃未声明字段，接口静默返回 `null`，前端相似度列全是 `—`。**改动"生效"了，字段却没了**，且无任何报错 | `schemas.LedgerRow` 补 `top1_similarity: float \| None`，并加 2 项不变量做「视图顶层 SELECT 列集合 vs Pydantic 字段集合」静态比对（只解析首个顶层 SELECT，按括号深度切分，避免把 LATERAL 内部别名当视图列） |
-| 12 | 重构 `demo.py` 时把授权与审批日志的写入代码**误缩进到 `_snapshot_for()` 的 `return` 之后**，成了死代码 | `license_record` 表恒为空 → 台账「授权费合计」恒为 ¥0，且 5 笔授权在界面上一笔都看不到。**这是本轮唯一的真实业务缺陷**，由 e2e 的一句 `license_record > 0` 断言抓出 | 拆出 `_seed_licenses()` / `_seed_approve_log()` 两个独立函数，在 `_load_assets()` 中显式调用；修复后授权费合计 ¥131,600 / 13 条日志 |
-
-第 1、2、4、5、6、7、8 条在 `tests/test_invariants.py` 里加了**负向回归检查**（把坏写法放回去，检查必须失败）；
-第三条在 `tests/test_compat_vector.py` 里检查"是否存在未受模式保护的 `::vector` 强转"。
-我们实际做了这个验证：注入坏代码后检查报 `✗` 并指出具体行号，恢复后全部通过。
-
-> **第 9–12 条是"用种子数据把五个页面逐个点一遍"时才暴露的** —— 它们有一个共同特征：> **都不报错**。数字格式正常、字段返回正常、页面渲染正常，错的是"值"和"有没有写进去"。
-> 第 12 条是最典型的一个：一次纯重构（拆函数）把 5 笔授权变成了死代码，接口 200、页面正常、
-> console 干净，只有一句刻意写下的数值断言（授权费合计必须 > 0）才抓到它。
-> 所以本轮把"UI 截图"升级成了 `tests/shoot_ui.py` 的 **49 项数值断言** —— 不只是拍张图好看，
-> 而是断言"这个格子里必须是 ¥131,600 这个数"，并在三种角色下各跑一遍。
-
-> **第 7、8 条是"用现有样本实跑一遍完整流程"时才暴露的** —— 静态审查和单元测试都没抓到：
-> 前者要看到界面才觉得"序号怪"，后者要看到台账那一列空着才起疑。
-> 这正说明「能跑通」和「跑对了」是两件事。运行记录见 `docs/verify/完整流程运行报告.md`。
-
-
-> 第 5 条顺带暴露了一个设计问题：`nz()` 原先在 `loadPending()` 和 `renderLedgerStats()` 里各写一份局部定义，
-> 这种复制粘贴在加 fallback 参数时会漏改其中一处。已提升为**模块级唯一实现**，并由测试守住"不得再出现局部定义"。
-
-### 13.1.1 前端的"能跑"降到什么程度
-
-`docs/01-工程说明书/演示前端与示例数据说明.md` 是种子数据版本的实测记录，这里是结论：
-
-- 启动日志 **4 条 WARNING / 0 条 ERROR**（3 条是 AI 后端降级，1 条是演示模式提示，均属设计内）
-- 浏览器端**四种角色**（`heritor01` / `heritor02` / `expert01` / `admin01`）各开独立上下文、轮转各自可见的 **5 个页签**
-  （我的作品 / 待审工作台 / 权属台账 / 母题库 / 溯源链）：
-  **console 错误 0、page 错误 0、请求失败 0、页面无 `undefined`/`NaN`/`[object Object]`**
-- `tests/shoot_ui.py` 的 49 项断言里，**数值类断言占多数**，不是只截图：
-  作品 8 件、母题 3 个、待审条数、台账授权费合计 ¥131,600、相似度列无 `—` 等，逐项比对种子真值
-- `tests/check_demo_page.py` 的 **52 项**针对交付用单文件演示页（`file://` 协议直开，无后端、无网络）：
-  7 章节渲染、身份切换后页签随角色增减、越权页签不出现在 DOM 里、母题筛选、作品详情含溯源链与专家意见、
-  AI 分析面板显示真实余弦相似度而非置信度、终审推翻 AI 建议后打上「已推翻」标记、
-  台账授权费合计 ¥131,600、重置按钮恢复初始状态、**断网后零新增请求**、五页签逐页无 `undefined`/`NaN`
-- API 全链路 52 项全部 PASS，其中"传承人越权访问待审列表 → 403"、"重复终审 → 409"、
-  "未终审即授权 → 409"三条是**反向验证**，证明约束确实在生效
-
-
-> 这类缺陷正是"不实跑"最容易漏掉的东西。所以**请务必在真实数据库上跑一遍 §5 的演示流程**，
-> 尤其是终审那一步 —— 它是唯一同时触碰触发器、事务、列级权限的地方。
-
-**请在首次部署时按 §1.0 逐条执行，并关注控制台输出。** 仍可能出问题的位置（已逐一定位）：
-
-| 位置 | 风险 | 应对 |
-|---|---|---|
-| `02` HNSW 索引 `WITH (m = 16, ef_construction = 64)` | HNSW 需 pgvector ≥ 0.5.0 | 老版本降级到 `ivfflat`（`WITH (lists = 100)`），或升级扩展；脚本已判断 pgvector 是否存在，无则跳过 |
-| `03` `vector_dims(base_vector)` | 0.7.0 起才有（降级模式下由兼容层提供等价函数） | 老版本原生模式改用 `array_length(base_vector::real[], 1)` |
-| `01` 重跑顺序 | `DROP TABLE ... CASCADE` 会删掉 `02` 建的视图与触发器 | 重跑 `01` 后**必须**重跑 `02` |
-| `01` 里 `\i 00_compat_vector.sql` | 相对路径依赖"从工程根目录执行 psql" | 若在别处执行，改为绝对路径或先 `cd` 到工程根目录 |
-
-另外，若遇到 `ERROR: could not open extension control file ".../vector.control"`，说明 pgvector 服务端文件没装 ——
-不过**这不影响使用**：`00_compat_vector.sql` 会捕获该错误并切到降级模式，功能照常。
-想用 HNSW 再按 §1.0 用 Docker 起库，或按 §2 装 pgvector。
-
-### 13.1.2 降级模式的边界（务必清楚）
-
-降级模式（无 pgvector）**不是**"打折扣跑通"，而是"换一种等价实现"：
-
-- 检索结果是**精确** cosine 排序，比 HNSW 的近似结果更准
-- 但复杂度 O(n)，且 `EXPLAIN` 看到的是 `Seq Scan` 而非 `Index Scan using ..._hnsw`
-- 因此：**不能用降级模式的执行计划去证明"HNSW 索引生效了"**。这条证据只能在有 pgvector 的环境取得
-- 同理，演示模式的红色横幅也写明了：列级 GRANT / 触发器 / CHECK / 外键 / MVCC 在内存存储下不生效
-
-### 13.2 builtin 特征后端的局限
-
-- **无语义理解**：不能做跨模态（文字↔图像）检索
-- **对大幅旋转敏感**：回纹这类周期网格纹样旋转 4° 后相似度约 0.75。这是刻意接受的取舍 —— 见 `features.py` 注释：多角度取最大会让"同一作品换个角度拍"被误判成另一个纹样，是更严重的错误方向。需要时用 `extract_rotation_robust()`（5× 耗时）或换 CLIP
-- **对透视/形变不鲁棒**：HOG 类特征的固有问题
-- **阈值是经验值**：需要在真实非遗图像数据集上重新标定
-
-### 13.3 工程层面的简化
-
-| 项 | 现状 | 生产建议 |
-|---|---|---|
-| 图片存储 | 本地 `data/uploads/`，UUID 命名 | 换对象存储 + 预签名 URL |
-| JWT 密钥 | 有开发默认值 | 必须用环境变量注入随机值 |
-| CORS | `allow_origins=["*"]` | 限定 Origin 白名单 |
-| 令牌存储 | `localStorage` | 有 XSS 风险；正式产品建议 `HttpOnly` cookie + CSRF token |
-| 谱系环检测 | 数据库触发器 `trg_genealogy_no_cycle` 拒绝多跳成环，递归视图 `v_asset_lineage` 可查任意深度祖先链 | 谱系**写入入口**尚未开放（当前没有 API 能登记衍生关系，只能由运维/种子写入）—— 开放时需同时决定"谁能给哪个资产建边"，避免越权伪造血缘 |
-| 审计日志 | 只增不归档 | 按时间分区 + 冷数据归档 |
-| 限流 | 无 | 上传与登录接口需限流 |
-
----
-
-## 14. 常见问题
-
-### 14.0 关于「怎么真实运行」
-
-**Q：我只想让它跑起来，最短路径是什么？**
-
-```bash
-docker compose up -d                          # 起带 pgvector 的库
-pip install -r requirements.txt
-python bootstrap.py --check                   # 它会告诉你还差什么
-```
-
-`bootstrap.py` 会逐层探测并给出**可直接复制的修复命令**，而不是一句"连接失败"：
-
-```
-2 / 4  探测 PostgreSQL
-  目标：postgres@127.0.0.1:5432/ich_heritage
-  ✗ 连不上 127.0.0.1:5432（ConnectionRefusedError）
-
-    ! 这台机器上没有可用的 PostgreSQL。有两种走法：
-     A. 装一个（推荐 Docker，最省事，自带 pgvector）：
-        docker run -d --name ich-pg -p 5432:5432 \
-          -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=ich_heritage \
-          pgvector/pgvector:pg16
-     B. 先看演示模式（内存存储，界面功能一样，但没有数据库约束验证）：
-        python bootstrap.py --demo
-```
-
-**Q：装不上 pgvector，还能真实运行吗？**
-
-能。`sql/00_compat_vector.sql` 会自动把向量层换成 `NUMERIC[]` + 自定义 `<=>` 运算符，
-表、触发器、视图、列级 GRANT、CHECK/UNIQUE/外键**全部照常生效** —— 只有 HNSW 索引退化为精确扫描。
-脚本会明确打印走了哪条路，不会静默切换。
-
-**Q：为什么 `docker compose up` 之后还提示"还没初始化"？**
-
-容器只提供"一个空的库"。建表要在容器 healthy 后手动执行 `sql/01~03`（顺序不能换）。
-`bootstrap.py --check` 会检测到 `已建业务表 0/8` 并把三条 psql 命令原样打出来。
-
-**Q：`initdb` 报"命令被安全策略拦截"**
-
-说明你在一个禁止创建数据库实例的受限环境里（如某些沙箱/CI）。这不是项目问题。
-在你的本机或服务器上正常执行即可；没有数据库时用 `python bootstrap.py --demo` 先看界面。
-
-**Q：怎么确认自己现在跑的是真库还是演示模式？**
-
-三种方式，任选：
-1. 页面顶部有没有**红色横幅**（有横幅 = 演示模式）
-2. `curl http://127.0.0.1:8000/api/meta` 看 `demo_mode` 字段是 `true` 还是 `false`
-3. `curl http://127.0.0.1:8000/api/health` 看 `database` 字段是数据库地址还是 `演示模式（内存存储，非 PostgreSQL）`
-
-### 14.1 其他常见问题
-
-**Q：`python -m app.cli check` 报 "Connection refused"**
-数据库没启动，或 `ICH_DB_*` 配置不对。先确认 `psql -d ich_heritage -c "select 1"` 能通。
-
-**Q：`CREATE EXTENSION vector` 失败，提示 "could not open extension control file"**
-pgvector 的服务端文件没装到 PostgreSQL 的 `share/extension/` 目录。
-**这不影响使用**：兼容层会捕获该错误并切到降级模式。想用 HNSW 见 §1.0（Docker）或 §2（安装 pgvector）。
-
-**Q：建库后 `v_asset_trace_chain` 报 "relation does not exist"**
-`02` 脚本没执行，或者执行了 `01` 之后没重跑 `02`（`DROP TABLE ... CASCADE` 会连带删掉视图）。
-
-**Q：AI 总是给出 `original` 建议**
-多半是母题向量还是占位值。跑 `python -m app.cli backfill-motif-vectors`。`check` 的第 9 项会提示。
-
-**Q：上传后待审列表里没有**
-`audit_status` 必须是 `pending`，`v_asset_pending_audit` 还要求存在 `state='pending'` 的 `audit_record`。检查是否上传时没勾 `auto_analyze`、也没手动点分析。
-
-**Q：专家终审报 403 "数据库层权限拒绝"**
-说明数据库 GRANT 生效了，但当前账号没有 `ich_expert` 权限。确认登录用户 `role` 是 `expert`，且后端连接账号有 `SET ROLE` 权限。
-
-**Q：日志里一直有 "特征后端 clip 不可用，继续降级"**
-正常，这是 `auto` 模式的预期行为。想消除就装 `requirements-deep.txt`，或显式设 `ICH_FEATURE_BACKEND=builtin`。
-
-**Q：Windows 下 `python run.py` 卡住不动**
-首次启动需要初始化连接池，稍等几秒。若持续卡住，检查防火墙是否拦截了到 5432 的连接。
-
-**Q：想换个端口 / 局域网演示**
-`python run.py --port 9000 --host 0.0.0.0`，然后同事用 `http://你的内网IP:9000/` 访问。
-
----
-
-## 交付说明
-
-| 交付项 | 位置 |
-|---|---|
-| 完整代码 | `app/`（后端 8 模块 + AI 3 模块 + 前端 2 文件）、`run.py`、`tests/` 5 个脚本 |
-| SQL 脚本 | `sql/01_init.sql`、`sql/02_index_trigger_view.sql`、`sql/03_seed.sql` |
-| 初始化说明 | 本文 §3 |
-| 启动命令 | 本文 §4 |
-| 演示流程 | 本文 §5（含 UI 操作与等价 curl 两版） |
-| 文件用途 | 本文 §6 |
-| 数据库原理对照 | 本文 §8（范式/索引/触发器/视图/事务/权限 六张表） |
-
-**核心业务规则的落地位置**：
-
-| 规则 | 实现在哪 |
-|---|---|
-| AI 只出建议，绝不改 `right_level` | §7 四层机制：列级 GRANT + 88 项不变量测试 + 分级器无 DB 依赖 + 触发器留痕 |
-| 终审由专家决定，事务原子完成 | `services.approve_asset()` 6 步单事务 + `FOR UPDATE` + `rowcount` 校验 |
-| 溯源日志追加式，不更新不删除 | `trg_syslog_immutable` + `REVOKE UPDATE/DELETE/TRUNCATE` + 应用层不留 UPDATE 路径 |
-| 分级标签取值 `public`/`derived`/`original` | `right_level_enum` 枚举类型 + CHECK 约束 |
-| 数据一致性（要么同时成功要么回滚） | `open_tx()` 统一事务上下文；触发器与主事务同生共死 |
+当前回归基线为 **15 套 / 641 项断言**；PostgreSQL 16.15 + pgvector 0.8.6 环境下，真库验收、并发验收、规则对拍及备份恢复均通过。数据库对象口径为 8 张业务表、10 个触发器、4 个视图；完整验收记录、性能对比、物理存储与 TOAST 实测、备份恢复报告保存在 `docs/verify/`。
