@@ -255,7 +255,7 @@ def main() -> int:
             print(f"  {GREEN}✓{RESET} {label} 齐全 ({len(expect)})")
 
     chk("8 张业务表", expected_tables, all_objs["table"])
-    chk("3 个视图", expected_views, all_objs["view"])
+    chk("4 个视图", expected_views, all_objs["view"])
     chk("3 个权限角色", expected_roles, all_objs["role"])
 
     # ---------- 外键目标表存在 ----------
